@@ -1,3 +1,4 @@
+from views.training_map_view import main
 """Point d'entree du jeu."""
 import arcade
 
