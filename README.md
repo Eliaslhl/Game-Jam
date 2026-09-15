@@ -1,6 +1,7 @@
-# Trouver un nom svp
+# Le Labyrinthe des Ames
 
-Jeu d'aventure/enigme 2D top-down developpe avec [Arcade](https://api.arcade.academy/).
+Niveau d'aventure/enigme 2D top-down jouable avec Pygame.
+Le squelette partage conserve les modules prevus pour le travail de l'equipe.
 Le joueur explore des labyrinthes, recolte des clefs, resout des enigmes, et bascule
 entre sa forme Vivante et sa forme Fantome (via une fiole de poison) pour traverser
 certains murs specifiques, en laissant derriere lui un cadavre interactif.
