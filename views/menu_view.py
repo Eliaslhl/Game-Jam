@@ -1,97 +1,141 @@
-"""Écran de menu principal."""
-import arcade
-import arcade.gui
+import pygame
 
 from settings import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
-    BACKGROUND,
-    PARCHMENT,
-    TITLE,
-    WOOD,
-    WOOD_LIGHT,
-    DIM,
-    FONT_TITLE,
-    FONT_UI,
+    SCREEN_TITLE,
+    UI_FONT_FILE,
+    TITLE_FONT_FILE,
+    INK,
+    PALE,
+    GOLD,
+    GHOST_BAR_BG,
+    KEY_TILE_BG,
+    TEXT_DIM,
 )
+from views import training_map_view
 
-MENU_ITEMS = ["Jouer", "Tutoriel", "Règles", "Quitter"]
+MENU_ITEMS = [
+    ("Jouer", "play"),
+    ("Tutoriel", "tutorial"),
+    ("Règles", "rules"),
+    ("Quitter", "quit"),
+]
 
-
-def button_style() -> dict:
-    base = dict(font_size=20, font_name=FONT_UI, border_width=2)
-    return {
-        "normal": arcade.gui.UIFlatButton.UIStyle(
-            **base, font_color=PARCHMENT, bg=WOOD, border=(0, 0, 0, 0)
-        ),
-        "hover": arcade.gui.UIFlatButton.UIStyle(
-            **base, font_color=arcade.color.WHITE, bg=WOOD_LIGHT, border=TITLE
-        ),
-        "press": arcade.gui.UIFlatButton.UIStyle(
-            **base, font_color=(20, 16, 12), bg=PARCHMENT, border=TITLE
-        ),
-        "disabled": arcade.gui.UIFlatButton.UIStyle(
-            **base, font_color=DIM, bg=(40, 36, 32), border=(0, 0, 0, 0)
-        ),
-    }
+BUTTON_WIDTH = 250
+BUTTON_HEIGHT = 56
+BUTTON_GAP = 16
 
 
-class MenuView(arcade.View):
-    def __init__(self) -> None:
-        super().__init__()
-        self.manager = arcade.gui.UIManager()
+class Button:
+    def __init__(self, label: str, action: str, rect: pygame.Rect) -> None:
+        self.label = label
+        self.action = action
+        self.rect = rect
+        self.hovered = False
+        self.pressed = False
 
-        self.title_text = arcade.Text(
-            "Deadweight",
-            SCREEN_WIDTH / 2,
-            SCREEN_HEIGHT - 150,
-            TITLE,
-            font_size=48,
-            anchor_x="center",
-            font_name=FONT_TITLE,
+    def handle_event(self, event: pygame.event.Event) -> str | None:
+        if event.type == pygame.MOUSEMOTION:
+            self.hovered = self.rect.collidepoint(event.pos)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.pressed = self.hovered
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            triggered = self.pressed and self.hovered
+            self.pressed = False
+            if triggered:
+                return self.action
+        return None
+
+    def draw(self, screen: pygame.Surface, font: pygame.font.Font) -> None:
+        if self.pressed and self.hovered:
+            bg, fg, border = PALE, INK, GOLD
+        elif self.hovered:
+            bg, fg, border = KEY_TILE_BG, (255, 255, 255), GOLD
+        else:
+            bg, fg, border = GHOST_BAR_BG, PALE, None
+
+        pygame.draw.rect(screen, bg, self.rect, border_radius=4)
+        if border is not None:
+            pygame.draw.rect(screen, border, self.rect, width=2, border_radius=4)
+
+        text_surface = font.render(self.label, True, fg)
+        screen.blit(text_surface, text_surface.get_rect(center=self.rect.center))
+
+
+class MenuScene:
+    def __init__(self, screen: pygame.Surface) -> None:
+        self.screen = screen
+        self.title_font = pygame.font.Font(str(TITLE_FONT_FILE), 48)
+        self.button_font = pygame.font.Font(str(UI_FONT_FILE), 20)
+
+        self.title_surface = self.title_font.render("Witch or Ghost", True, GOLD)
+        self.title_rect = self.title_surface.get_rect(
+            center=(SCREEN_WIDTH // 2, 120)
         )
 
-        style = button_style()
-        v_box = arcade.gui.UIBoxLayout(space_between=16)
+        total_height = len(MENU_ITEMS) * BUTTON_HEIGHT + (len(MENU_ITEMS) - 1) * BUTTON_GAP
+        start_y = SCREEN_HEIGHT // 2 - total_height // 2 + 40
 
-        actions = {
-            "Jouer": self.on_click_play,
-            "Tutoriel": self.on_click_tutorial,
-            "Règles": self.on_click_rules,
-            "Quitter": self.on_click_quit,
-        }
-        for label, callback in actions.items():
-            button = arcade.gui.UIFlatButton(
-                text=label, width=250, height=56, style=style
-            )
-            button.on_click = callback
-            v_box.add(button)
+        self.buttons = []
+        for i, (label, action) in enumerate(MENU_ITEMS):
+            rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+            rect.center = (SCREEN_WIDTH // 2, start_y + i * (BUTTON_HEIGHT + BUTTON_GAP))
+            self.buttons.append(Button(label, action, rect))
 
-        anchor = arcade.gui.UIAnchorLayout()
-        anchor.add(child=v_box, anchor_x="center_x", anchor_y="center_y", align_y=-40)
-        self.manager.add(anchor)
+    def handle_event(self, event: pygame.event.Event) -> str | None:
+        for button in self.buttons:
+            action = button.handle_event(event)
+            if action is not None:
+                return action
+        return None
 
-    def on_show_view(self) -> None:
-        arcade.set_background_color(BACKGROUND)
-        self.manager.enable()
+    def draw(self) -> None:
+        self.screen.fill(INK)
+        self.screen.blit(self.title_surface, self.title_rect)
+        for button in self.buttons:
+            button.draw(self.screen, self.button_font)
 
-    def on_hide_view(self) -> None:
-        self.manager.disable()
 
-    def on_draw(self) -> None:
-        self.clear()
-        self.title_text.draw()
+def _new_window() -> pygame.Surface:
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption(SCREEN_TITLE)
+    return screen
 
-        self.manager.draw()
 
-    def on_click_play(self, event) -> None:
-        print("Zaizai")
+def run(screen: pygame.Surface) -> None:
+    clock = pygame.time.Clock()
+    scene = MenuScene(screen)
 
-    def on_click_tutorial(self, event) -> None:
-        print("Zouzou")
+    while True:
+        clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return
 
-    def on_click_rules(self, event) -> None:
-        print("Zonzon")
+            action = scene.handle_event(event)
+            if action == "play":
+                print("Zaizai")
+            elif action == "tutorial":
+                training_map_view.main()
+                pygame.init()
+                screen = _new_window()
+                scene = MenuScene(screen)
+            elif action == "rules":
+                print("Zonzon")
+            elif action == "quit":
+                return
 
-    def on_click_quit(self, event) -> None:
-        arcade.exit()
+        scene.draw()
+        pygame.display.flip()
+
+
+def main() -> None:
+    pygame.init()
+    screen = _new_window()
+    run(screen)
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    main()
