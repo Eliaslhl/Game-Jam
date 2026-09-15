@@ -5,9 +5,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import pygame
-from src.game.mechanics.ghost_mode import GhostModeController, PlayerState
-from src.game.mechanics.interactions import can_interact, is_visible
-from src.game.mechanics.ghost_animation import YureiWalk
+from systems.ghost_mode import GhostModeController, PlayerState
+from systems.interactions import can_interact, is_visible
+from entities.ghost import YureiWalk
 
 TILE = 40
 RENDER_SIZE = (800, 935)
