@@ -51,4 +51,4 @@ tests/                        Tests unitaires
 | `levels/` (labyrinthe, clefs, portes) | Elias |
 | `puzzles/` (leviers, enigmes)     | - |
 | `enemies/`, `traps/`              | - |
-| `ui/`, `audio/`, assemblage final | Thomas |
+| `ui/`, `audio/`, assemblage final |  |
