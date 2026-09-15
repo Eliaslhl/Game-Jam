@@ -1,4 +1,4 @@
-"""Verification des regles fantome et du parcours Pygame de Kadir."""
+﻿"""Verification des regles fantome et du parcours Pygame de Kadir."""
 import os
 import unittest
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')

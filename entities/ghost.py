@@ -5,7 +5,7 @@ import pygame
 
 class YureiWalk:
     def __init__(self):
-        path = Path(__file__).resolve().parents[1] / 'assets/images/ghost/Yurei/Walk.png'
+        path = Path(__file__).resolve().parents[1] / 'assets/sprites/Yurei/Walk.png'
         sheet = pygame.image.load(str(path)).convert_alpha()
         size = sheet.get_height()
         self.frames = []

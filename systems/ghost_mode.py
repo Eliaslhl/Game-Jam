@@ -4,7 +4,7 @@ Responsable : Kadir
 """
 from enum import Enum, auto
 from systems.potion import PotionInventory
-from settings import GHOST_MODE_DURATION
+from settings import GHOST_MODE_DURATION, POISON_VIAL_START_COUNT, RESURRECTION_VIAL_START_COUNT
 
 
 class PlayerState(Enum):
@@ -18,10 +18,13 @@ class GhostModeController:
         self.duration = duration
         self.time_remaining = 0.0
         self.corpse_position = None
-        self.potions = PotionInventory()
+        # Deux fioles distinctes : le poison fait mourir (-> fantome), la
+        # resurrection ramene a la vie. Independantes l'une de l'autre.
+        self.poison_potions = PotionInventory(POISON_VIAL_START_COUNT)
+        self.resurrection_potions = PotionInventory(RESURRECTION_VIAL_START_COUNT)
 
     def enter_ghost_mode(self, position=(0, 0)) -> bool:
-        if self.state is PlayerState.GHOST or not self.potions.drink():
+        if self.state is PlayerState.GHOST or not self.poison_potions.drink():
             return False
         self.corpse_position = tuple(position)
         self.state = PlayerState.GHOST
@@ -43,3 +46,9 @@ class GhostModeController:
 
     def can_pass_wall(self, ghost_passable: bool) -> bool:
         return self.state is PlayerState.GHOST and ghost_passable
+
+    @property
+    def potions(self) -> PotionInventory:
+        """Alias retro-compatible vers les fioles de poison, pour le niveau final
+        de Kadir (`final_level.py`) qui utilise encore un seul pool partage."""
+        return self.poison_potions
