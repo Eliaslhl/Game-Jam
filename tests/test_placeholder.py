@@ -1,5 +1,5 @@
 """Test de fumee : verifie que le module principal s'importe correctement."""
-from src.game import settings
+import settings
 
 
 def test_settings_loaded() -> None:
