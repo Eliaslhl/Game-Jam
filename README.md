@@ -49,6 +49,6 @@ tests/                        Tests unitaires
 | `entities/player.py`, mouvement, collisions, PV |  |
 | `mechanics/` (fantome, potion)    |  |
 | `levels/` (labyrinthe, clefs, portes) | Elias |
-| `puzzles/` (leviers, enigmes)     | - |
+| `puzzles/` (leviers, enigmes)     | Mélissa |
 | `enemies/`, `traps/`              | - |
 | `ui/`, `audio/`, assemblage final |  |
