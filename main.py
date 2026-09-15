@@ -1,8 +1,5 @@
-"""Point d'entree du jeu."""
+﻿"""Point d'entree Pygame : Le Labyrinthe des Ames, niveau de Kadir."""
+from views.final_map_view import main
 
-def main() -> None:
-    return
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

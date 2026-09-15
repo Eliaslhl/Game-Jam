@@ -1,6 +1,7 @@
-# Trouver un nom svp
+# Le Labyrinthe des Ames
 
-Jeu d'aventure/enigme 2D top-down developpe avec [Arcade](https://api.arcade.academy/).
+Niveau d'aventure/enigme 2D top-down jouable avec Pygame.
+Le squelette partage conserve les modules prevus pour le travail de l'equipe.
 Le joueur explore des labyrinthes, recolte des clefs, resout des enigmes, et bascule
 entre sa forme Vivante et sa forme Fantome (via une fiole de poison) pour traverser
 certains murs specifiques, en laissant derriere lui un cadavre interactif.
@@ -80,6 +81,40 @@ La map autonome utilise `systems/ghost_mode.py`, `systems/potion.py`,
 `systems/interactions.py`, `entities/ghost.py` et `settings.py`. Les sprites Yurei
 sont dans `assets/images/ghost/Yurei/`. La fenetre reste en 640 x 748 pixels.
 Voir [les commandes et le parcours de test](test_map/README.md).
-Le `main.py` du nouveau squelette est actuellement vide.
+Le `main.py` lance maintenant le niveau final de Kadir avec Pygame.
 
 Verification : `python -m unittest discover -s tests -v`.
+
+## Niveau final : Le Labyrinthe des Ames
+
+```bash
+python main.py
+```
+
+Map de 61 x 43 cases, camera qui suit le joueur, fenetre de 800 x 560 pixels.
+Trois ailes a explorer et trois cles physiques pour ouvrir la sortie au sud-est.
+Le pixel art est dessine en code avec des sprites ASCII inspires de GAUNTLET ;
+le fantome utilise Yurei Walk. Les decors ne necessitent aucun telechargement.
+
+- Fleches / ZQSD / WASD : marcher.
+- P : boire une potion, 10 secondes en fantome.
+- Entree : revenir au corps avant la fin du temps.
+- E : ouvrir une porte dont le sceau a ete decouvert, ou lire une stele.
+- M : atlas des zones explorees (met en pause).
+- H : aide et regles (met en pause).
+- R : recommencer le niveau ; Echap : quitter.
+
+La brume violette est inaccessible vivant. En fantome, elle devient translucide
+et la vision passe de 94 a 142 pixels. Les sceaux sont uniquement visibles et
+memorisables en fantome ; les portes et cles restent physiques.
+
+Donnees editables : `assets/maps/labyrinthe_des_ames_kadir.json`.
+Regles : `systems/final_level.py`. Rendu : `views/final_map_view.py`.
+Sprites et tuiles en code : `views/pixel_art.py`.
+
+Voir [le guide du niveau](docs/niveau_final_kadir.md) et les apercus :
+[sanctuaire](docs/apercu_sanctuaire.png), [brume spectrale](docs/apercu_brume_fantome.png),
+[atlas complet (spoilers)](docs/atlas_niveau_kadir.png).
+
+Verification sans fenetre : `python main.py --smoke-test` et
+`python -m unittest discover -s tests -v`.
