@@ -77,12 +77,12 @@ class TrainingLevel:
             if self.mode.enter_ghost_mode(self.position):
                 self.say("Votre corps reste ici. Traversez le mur dore.")
             else:
-                self.say("Plus de fioles. R pour recommencer.")
-        elif self.mode.potions.drink():
+                self.say("Plus de fioles de poison. R pour recommencer.")
+        elif self.mode.resurrection_potions.drink():
             self.mode.return_to_alive()
             self.say("Vous reprenez forme humaine, ici meme.")
         else:
-            self.say("Plus de fioles pour redevenir humain : attendez que le temps s'ecoule.")
+            self.say("Plus de fioles de resurrection : attendez que le temps s'ecoule.")
 
     def update(self, dt, direction=(0, 0)):
         if self.won:
@@ -91,8 +91,9 @@ class TrainingLevel:
         self.message_time = max(0, self.message_time - dt)
         restored = self.mode.update(dt)
         if restored is not None:
-            self.position.update(restored)
-            self.say("Le temps est ecoule. Vous reprenez vie dans votre corps.")
+            # Ni le retour volontaire (P) ni l'expiration du temps ne doivent vous
+            # teleporter au cadavre : on redevient humain la ou l'on se trouve.
+            self.say("Le temps est ecoule. Vous reprenez forme humaine, ici meme.")
 
         direction = pygame.Vector2(direction)
         if direction.length_squared():

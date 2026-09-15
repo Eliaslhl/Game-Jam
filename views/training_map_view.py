@@ -166,7 +166,8 @@ class TrainingGame:
         pygame.draw.line(screen, (61, 65, 64), (8, 73), (SIZE[0] - 8, 73))
         status = "AME ERRANTE" if level.ghost else "VIVANT"
         self.label(screen, status, (8, 79), (154, 222, 211) if level.ghost else WHITE, self.small)
-        self.label(screen, f"FIOLES {level.mode.potions.count}", (SIZE[0] - 70, 79), (192, 150, 228), self.small)
+        self.label(screen, f"POISON {level.mode.poison_potions.count}", (SIZE[0] - 118, 79), (192, 150, 228), self.small)
+        self.label(screen, f"RESUR. {level.mode.resurrection_potions.count}", (SIZE[0] - 118, 93), (150, 200, 228), self.small)
         if level.ghost:
             pygame.draw.rect(screen, (43, 48, 63), (70, 80, 80, 4))
             pygame.draw.rect(screen, (172, 136, 223), (70, 80, int(80 * level.mode.time_remaining / level.mode.duration), 4))
