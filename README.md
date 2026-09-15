@@ -46,9 +46,9 @@ tests/                        Tests unitaires
 
 | Module                          | Responsable |
 |----------------------------------|-------------|
-| `entities/player.py`, mouvement, collisions, PV | Thais |
-| `mechanics/` (fantome, potion)    | Kadir |
-| `levels/` (labyrinthe, clefs, portes) | Melissa |
-| `puzzles/` (leviers, enigmes)     | - |
+| `entities/player.py`, mouvement, collisions, PV |  |
+| `mechanics/` (fantome, potion)    |  |
+| `levels/` (labyrinthe, clefs, portes) | Elias |
+| `puzzles/` (leviers, enigmes)     | Mélissa |
 | `enemies/`, `traps/`              | - |
-| `ui/`, `audio/`, assemblage final | Thomas |
+| `ui/`, `audio/`, assemblage final |  |
