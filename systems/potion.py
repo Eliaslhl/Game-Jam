@@ -2,7 +2,7 @@
 
 Responsable : Kadir
 """
-from src.game.settings import POISON_VIAL_START_COUNT
+from settings import POISON_VIAL_START_COUNT
 
 
 class PotionInventory:

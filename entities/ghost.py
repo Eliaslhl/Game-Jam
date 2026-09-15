@@ -1,11 +1,11 @@
-﻿"""Animation Pygame de Yurei Walk. Responsable : Kadir."""
+"""Animation Pygame de Yurei Walk. Responsable : Kadir."""
 from pathlib import Path
 import pygame
 
 
 class YureiWalk:
     def __init__(self):
-        path = Path(__file__).resolve().parents[3] / 'assets/sprites/Yurei/Walk.png'
+        path = Path(__file__).resolve().parents[1] / 'assets/images/ghost/Yurei/Walk.png'
         sheet = pygame.image.load(str(path)).convert_alpha()
         size = sheet.get_height()
         self.frames = []

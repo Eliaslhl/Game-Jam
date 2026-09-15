@@ -22,33 +22,64 @@ python main.py
 ## Arborescence
 
 ```
-main.py                    Point d'entree
-src/game/
-├── settings.py             Constantes globales (taille fenetre, vitesses, timers...)
-├── views/                  Ecrans Arcade (menu, jeu, victoire, defaite)
-├── entities/               Joueur, fantome, cadavre
-├── mechanics/               Mecanique vivant/fantome, potion, interactions physiques
-├── levels/                  Chargement des labyrinthes, donnees de niveaux
-├── puzzles/                 Leviers, portes/clefs, indices/zones secretes
-├── enemies/                  IA ennemis / patrouilles
-├── traps/                    Pieges du labyrinthe
-├── ui/                       HUD, menus, ecrans de fin
-└── audio/                    Gestion des sons/musiques
-assets/
-├── sprites/{player,ghost,skeleton,decor}
-├── tilesets/                 Tuiles des labyrinthes
+main.py                        Point d'entree
+settings.py                    Constantes globales (taille fenetre, vitesses, timers...)
+requirements.txt
+
+views/                         Ecrans Arcade
+├── menu_view.py                 Ecran d'accueil
+├── game_view.py                 Boucle principale de gameplay
+├── game_over_view.py            Ecran de defaite
+├── victory_view.py              Ecran de victoire
+├── hud.py                       Barre de vie, clefs, fioles, timer fantome
+└── menus.py                     Elements de menu reutilisables
+
+entities/                      Elements interactifs
+├── player.py                   Forme Vivante du joueur
+├── ghost.py                     Forme Fantome du joueur
+├── corpse.py                    Cadavre laisse au sol
+└── traps.py                     Pieges du labyrinthe
+
+systems/                       Logique metier et chargeurs
+├── level_manager.py             Chargement des cartes (Tiled) et labyrinthe
+├── audio_manager.py             Effets sonores et musique
+├── ghost_mode.py                 Bascule Vivant <-> Fantome
+├── potion.py                     Fioles de poison
+├── interactions.py               Regles d'interaction selon l'etat du joueur
+├── levers.py                     Leviers / mecanismes
+├── secrets.py                    Indices visibles en mode Fantome
+└── doors_keys.py                 Correspondance clefs <-> portes
+
+assets/                        Fichiers medias
+├── images/{player,ghost,skeleton,decor}
+├── maps/                        Cartes Tiled et tilesets
 ├── sounds/
 └── fonts/
-tests/                        Tests unitaires
+
+tests/                          Tests unitaires
 ```
 
 ## Repartition des taches
 
-| Module                          | Responsable |
-|----------------------------------|-------------|
-| `entities/player.py`, mouvement, collisions, PV | Thais |
-| `mechanics/` (fantome, potion)    | Kadir |
-| `levels/` (labyrinthe, clefs, portes) | Melissa |
-| `puzzles/` (leviers, enigmes)     | - |
-| `enemies/`, `traps/`              | - |
-| `ui/`, `audio/`, assemblage final | Thomas |
+| Module                                          | Responsable |
+|--------------------------------------------------|-------------|
+| `entities/player.py`, mouvement, collisions, PV   |  |
+| `entities/ghost.py`, `systems/ghost_mode.py`, `systems/potion.py` |  |
+| `systems/level_manager.py`, `systems/doors_keys.py` | Elias |
+| `systems/levers.py`, `systems/secrets.py`         | Mélissa |
+| `entities/enemy.py`, `entities/traps.py`          | - |
+| `views/hud.py`, `views/menus.py`, `systems/audio_manager.py` |  |
+
+## Prototype fantome de Kadir (Pygame)
+
+```bash
+python test_map/map_test_kadir.py
+```
+
+La map autonome utilise `systems/ghost_mode.py`, `systems/potion.py`,
+`systems/interactions.py`, `entities/ghost.py` et `settings.py`. Les sprites Yurei
+sont dans `assets/images/ghost/Yurei/`. La fenetre reste en 640 x 748 pixels.
+Voir [les commandes et le parcours de test](test_map/README.md).
+Le `main.py` du nouveau squelette est actuellement vide.
+
+Verification : `python -m unittest discover -s tests -v`.

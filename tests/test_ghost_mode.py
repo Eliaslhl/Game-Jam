@@ -1,11 +1,11 @@
-﻿"""Verification des regles fantome et du parcours Pygame de Kadir."""
+"""Verification des regles fantome et du parcours Pygame de Kadir."""
 import os
 import unittest
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 import pygame
-from src.game.mechanics.ghost_mode import GhostModeController, PlayerState
-from src.game.mechanics.interactions import can_interact, is_visible
+from systems.ghost_mode import GhostModeController, PlayerState
+from systems.interactions import can_interact, is_visible
 from test_map.map_test_kadir import TestMapKadir, PLAN
 
 

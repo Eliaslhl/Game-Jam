@@ -3,8 +3,8 @@
 Responsable : Kadir
 """
 from enum import Enum, auto
-from src.game.mechanics.potion import PotionInventory
-from src.game.settings import GHOST_MODE_DURATION
+from systems.potion import PotionInventory
+from settings import GHOST_MODE_DURATION
 
 
 class PlayerState(Enum):

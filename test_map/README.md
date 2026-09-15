@@ -1,4 +1,4 @@
-﻿# Map de test de Kadir (Pygame)
+# Map de test de Kadir (Pygame)
 
 Depuis la racine Game-Jam :
 
@@ -8,7 +8,7 @@ python test_map/map_test_kadir.py
 ```
 
 Plan ASCII de 20 x 20 cases inspire de GAUNTLET.py. Joueur vivant bleu,
-fantome anime avec les cinq frames de assets/sprites/Yurei/Walk.png.
+fantome anime avec les cinq frames de assets/images/ghost/Yurei/Walk.png.
 
 - Fleches, ZQSD ou WASD : deplacement.
 - P : consommer une des 3 potions et devenir fantome pendant 10 secondes.
@@ -34,8 +34,9 @@ est le choix de cette demo, a coordonner avec Thais pour l'integration.
 Le cadavre est affiche pendant l'exploration fantome ; les dalles et les jets de
 flammes ne sont pas implementes dans ce banc de test.
 
-La demo utilise les modules mechanics/ghost_mode.py, interactions.py, potion.py
-et ghost_animation.py. Le point d'entree main.py est encore le squelette Arcade
-du projet : lancer directement cette map pour tester la feature Pygame.
+La demo utilise systems/ghost_mode.py, systems/interactions.py, systems/potion.py
+et entities/ghost.py (animation YureiWalk), avec les constantes dans settings.py.
+Le point d'entree main.py est vide dans le nouveau squelette du projet : lancer
+directement cette map pour tester la feature Pygame.
 
 Tests sans fenetre : `python -m unittest discover -s tests -v`.

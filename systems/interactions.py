@@ -4,7 +4,7 @@ Responsable : Kadir
 """
 
 
-from src.game.mechanics.ghost_mode import PlayerState
+from systems.ghost_mode import PlayerState
 
 
 def can_interact(player_state, target=None) -> bool:
