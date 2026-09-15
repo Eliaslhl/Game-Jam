@@ -1,4 +1,4 @@
-# Deadweight (nom provisoire)
+# Trouver un nom svp
 
 Jeu d'aventure/enigme 2D top-down developpe avec [Arcade](https://api.arcade.academy/).
 Le joueur explore des labyrinthes, recolte des clefs, resout des enigmes, et bascule
