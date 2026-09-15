@@ -1,10 +1,10 @@
-# Le Labyrinthe des Ames
+# Deadweight — Le Labyrinthe des Ames
 
-Niveau d'aventure/enigme 2D top-down jouable avec Pygame.
-Le squelette partage conserve les modules prevus pour le travail de l'equipe.
-Le joueur explore des labyrinthes, recolte des clefs, resout des enigmes, et bascule
-entre sa forme Vivante et sa forme Fantome (via une fiole de poison) pour traverser
-certains murs specifiques, en laissant derriere lui un cadavre interactif.
+Jeu d'aventure/enigme 2D top-down jouable avec Pygame. Le joueur explore des
+labyrinthes, resout des enigmes, et bascule entre sa forme Vivante et sa forme
+Fantome (fiole de poison pour mourir, fiole de resurrection pour revenir) afin
+de traverser certains murs specifiques ("murs dores"), en laissant derriere lui
+un cadavre.
 
 ## Installation
 
@@ -14,50 +14,103 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Lancer le jeu
+## Le jeu principal : Le Sanctuaire des Veilleurs
 
 ```bash
 python main.py
 ```
 
+Sanctuaire radial (hub central + 8 salles thematiques : bibliotheque, cryptes,
+jardin, salle abandonnee, salle fantome...), plein ecran. Camera qui suit le
+joueur, carte complete avec brouillard de guerre (`M`), particules ambiantes
+(poussiere, fumee des torches), ames errantes visibles uniquement en fantome,
+symboles secrets invisibles pour un vivant.
+
+- ZQSD / fleches : se deplacer.
+- `P` : boire une fiole de poison (devenir fantome) ou de resurrection
+  (redevenir humain, a l'endroit ou l'on se trouve).
+- `M` : afficher/masquer la carte.
+- `R` : recommencer.
+
+Code : `views/simple_map_view.py` (boucle de jeu), `views/map_theme.py` (decor
+et identite des salles), `views/effects.py` (ames errantes, animation de
+transformation), `systems/training_level.py` (regles, plan ASCII partage avec
+le couloir d'entrainement). Carte editable : `assets/maps/sanctuaire_radial.json`.
+
+## Couloir d'entrainement
+
+```bash
+python -m views.training_map_view
+```
+
+Couloir en ligne droite avec un seul mur dore : sert a valider la mecanique
+vivant/fantome isolement, avant la vraie carte. Meme moteur que le Sanctuaire
+(`systems/training_level.py`), carte dans `assets/maps/training_corridor.json`.
+
+## Niveau final de Kadir : Le Labyrinthe des Ames
+
+```bash
+python test_map/map_test_kadir.py
+```
+
+Prototype independant : map de 61 x 43 cases, trois ailes a explorer, trois
+cles physiques, sceaux visibles uniquement en fantome, brume violette. Voir
+[test_map/README.md](test_map/README.md) pour le detail des commandes et le
+parcours de verification, et [docs/niveau_final_kadir.md](docs/niveau_final_kadir.md)
+pour le guide complet. Regles : `systems/final_level.py`. Rendu :
+`views/final_map_view.py`.
+
+## Verification
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Chaque vue accepte aussi `--smoke-test` (ouvre un rendu sans fenetre visible
+puis quitte, utile en CI) : `python main.py --smoke-test`.
+
 ## Arborescence
 
 ```
-main.py                        Point d'entree
-settings.py                    Constantes globales (taille fenetre, vitesses, timers...)
+main.py                        Point d'entree (lance le Sanctuaire)
+settings.py                    Constantes globales (fenetre, vitesses, timers, fioles...)
 requirements.txt
 
-views/                         Ecrans Arcade
-├── menu_view.py                 Ecran d'accueil
-├── game_view.py                 Boucle principale de gameplay
-├── game_over_view.py            Ecran de defaite
-├── victory_view.py              Ecran de victoire
-├── hud.py                       Barre de vie, clefs, fioles, timer fantome
-└── menus.py                     Elements de menu reutilisables
+views/
+├── simple_map_view.py           Boucle de jeu du Sanctuaire (camera, HUD, rendu)
+├── map_theme.py                 Decor statique et identite des 9 salles du Sanctuaire
+├── effects.py                   Ames errantes, animation de transformation, poussiere
+├── pixel_effects.py             Utilitaires de rendu partages (sprites ASCII, halos)
+├── pixel_art.py                 Generateur de tuiles pierre/torches (partage avec Kadir)
+├── training_map_view.py         Couloir d'entrainement (mecanique isolee)
+├── final_map_view.py            Rendu du niveau final de Kadir
+├── menu_view.py / game_view.py / hud.py / menus.py / victory_view.py / game_over_view.py
+│                                 Ecrans encore a construire (squelette d'equipe)
 
-entities/                      Elements interactifs
-├── player.py                   Forme Vivante du joueur
-├── ghost.py                     Forme Fantome du joueur
-├── corpse.py                    Cadavre laisse au sol
-└── traps.py                     Pieges du labyrinthe
+entities/
+├── ghost.py                     Animation Yurei (sprite fantome partage)
+├── player.py / corpse.py / traps.py
+│                                 A construire
 
-systems/                       Logique metier et chargeurs
-├── level_manager.py             Chargement des cartes (Tiled) et labyrinthe
-├── audio_manager.py             Effets sonores et musique
-├── ghost_mode.py                 Bascule Vivant <-> Fantome
-├── potion.py                     Fioles de poison
+systems/
+├── training_level.py            Regles vivant/fantome (Sanctuaire + couloir d'entrainement)
+├── final_level.py               Regles du niveau final de Kadir
+├── ghost_mode.py                 Bascule Vivant <-> Fantome, fioles poison/resurrection
+├── potion.py                     Inventaire de fioles
 ├── interactions.py               Regles d'interaction selon l'etat du joueur
-├── levers.py                     Leviers / mecanismes
-├── secrets.py                    Indices visibles en mode Fantome
-└── doors_keys.py                 Correspondance clefs <-> portes
+├── level_manager.py / doors_keys.py / levers.py / secrets.py / audio_manager.py
+│                                 A construire
 
-assets/                        Fichiers medias
-├── images/{player,ghost,skeleton,decor}
-├── maps/                        Cartes Tiled et tilesets
+assets/
+├── sprites/Yurei/                Sprite anime du fantome (Walk, Attack, Idle...)
+├── maps/                         Cartes Tiled/ASCII (sanctuaire_radial, training_corridor,
+│                                  labyrinthe_des_ames_kadir)
 ├── sounds/
 └── fonts/
 
-tests/                          Tests unitaires
+tests/                          Tests unitaires (`python -m unittest discover -s tests`)
+test_map/                       Prototype autonome de Kadir + son propre README
+docs/                           Apercus et guides des niveaux
 ```
 
 ## Repartition des taches
@@ -65,56 +118,8 @@ tests/                          Tests unitaires
 | Module                                          | Responsable |
 |--------------------------------------------------|-------------|
 | `entities/player.py`, mouvement, collisions, PV   |  |
-| `entities/ghost.py`, `systems/ghost_mode.py`, `systems/potion.py` |  |
+| `entities/ghost.py`, `systems/ghost_mode.py`, `systems/potion.py` | Kadir |
 | `systems/level_manager.py`, `systems/doors_keys.py` | Elias |
 | `systems/levers.py`, `systems/secrets.py`         | Mélissa |
-| `entities/enemy.py`, `entities/traps.py`          | - |
+| `entities/traps.py`                               | - |
 | `views/hud.py`, `views/menus.py`, `systems/audio_manager.py` |  |
-
-## Prototype fantome de Kadir (Pygame)
-
-```bash
-python test_map/map_test_kadir.py
-```
-
-La map autonome utilise `systems/ghost_mode.py`, `systems/potion.py`,
-`systems/interactions.py`, `entities/ghost.py` et `settings.py`. Les sprites Yurei
-sont dans `assets/images/ghost/Yurei/`. La fenetre reste en 640 x 748 pixels.
-Voir [les commandes et le parcours de test](test_map/README.md).
-Le `main.py` lance maintenant le niveau final de Kadir avec Pygame.
-
-Verification : `python -m unittest discover -s tests -v`.
-
-## Niveau final : Le Labyrinthe des Ames
-
-```bash
-python main.py
-```
-
-Map de 61 x 43 cases, camera qui suit le joueur, fenetre de 800 x 560 pixels.
-Trois ailes a explorer et trois cles physiques pour ouvrir la sortie au sud-est.
-Le pixel art est dessine en code avec des sprites ASCII inspires de GAUNTLET ;
-le fantome utilise Yurei Walk. Les decors ne necessitent aucun telechargement.
-
-- Fleches / ZQSD / WASD : marcher.
-- P : boire une potion, 10 secondes en fantome.
-- Entree : revenir au corps avant la fin du temps.
-- E : ouvrir une porte dont le sceau a ete decouvert, ou lire une stele.
-- M : atlas des zones explorees (met en pause).
-- H : aide et regles (met en pause).
-- R : recommencer le niveau ; Echap : quitter.
-
-La brume violette est inaccessible vivant. En fantome, elle devient translucide
-et la vision passe de 94 a 142 pixels. Les sceaux sont uniquement visibles et
-memorisables en fantome ; les portes et cles restent physiques.
-
-Donnees editables : `assets/maps/labyrinthe_des_ames_kadir.json`.
-Regles : `systems/final_level.py`. Rendu : `views/final_map_view.py`.
-Sprites et tuiles en code : `views/pixel_art.py`.
-
-Voir [le guide du niveau](docs/niveau_final_kadir.md) et les apercus :
-[sanctuaire](docs/apercu_sanctuaire.png), [brume spectrale](docs/apercu_brume_fantome.png),
-[atlas complet (spoilers)](docs/atlas_niveau_kadir.png).
-
-Verification sans fenetre : `python main.py --smoke-test` et
-`python -m unittest discover -s tests -v`.
