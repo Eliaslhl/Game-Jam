@@ -52,3 +52,32 @@ tests/                        Tests unitaires
 | `puzzles/` (leviers, enigmes)     | Mélissa |
 | `enemies/`, `traps/`              | - |
 | `ui/`, `audio/`, assemblage final |  |
+
+mon_jeu_gamejam/
+│
+├── README.md                   # [Tous] Documentation, commandes et pitch du jeu
+├── requirements.txt            # [] Liste des dépendances (arcade, etc.)
+├── settings.py                 # [] Constantes globales (écran, FPS, touches)
+├── main.py                     # [] Point d'entrée pour lancer le jeu
+│
+├── views/                      # Écrans du jeu (vues Arcade)
+│   ├── __init__.py
+│   ├── menu_view.py            # [] Écran d'accueil et tutoriel
+│   ├── game_view.py            # [] Boucle principale de gameplay
+│   └── game_over_view.py       # [] Écran de défaite / bilan des morts
+│
+├── entities/                   # Éléments interactifs
+│   ├── __init__.py
+│   ├── player.py               # [] Contraintes de déplacement du joueur
+│   ├── corpse.py               # [] Corps laissés au sol
+│   └── enemy.py                # [] Pièges et ennemis causant la mort
+│
+├── systems/                    # Logique métier et chargeurs
+│   ├── __init__.py
+│   ├── level_manager.py        # [] Chargement des cartes (Tiled)
+│   └── audio_manager.py        # [] Effets sonores et musique d'ambiance
+│
+└── assets/                     # Fichiers médias
+    ├── images/                 # [] Textures et sprites
+    ├── sounds/                 # [] Fichiers audio (.wav / .mp3)
+    └── maps/                   # [] Cartes au format .tmx / .json
