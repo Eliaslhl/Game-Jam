@@ -32,6 +32,10 @@ symboles secrets invisibles pour un vivant.
 - `M` : afficher/masquer la carte.
 - `R` : recommencer.
 
+Trois cles sont cachees dans la Bibliotheque, la Chapelle et le Jardin ; elles
+ouvrent la porte qui garde l'Autel (et la sortie), accessible uniquement en
+traversant le mur dore en mode Fantome.
+
 Code : `views/simple_map_view.py` (boucle de jeu), `views/map_theme.py` (decor
 et identite des salles), `views/effects.py` (ames errantes, animation de
 transformation), `systems/training_level.py` (regles, plan ASCII partage avec
@@ -84,7 +88,8 @@ views/
 ├── pixel_art.py                 Generateur de tuiles pierre/torches (partage avec Kadir)
 ├── training_map_view.py         Couloir d'entrainement (mecanique isolee)
 ├── final_map_view.py            Rendu du niveau final de Kadir
-├── menu_view.py / game_view.py / hud.py / menus.py / victory_view.py / game_over_view.py
+├── game_view.py                  Prototype de labyrinthe independant (Thais)
+├── menu_view.py / hud.py / menus.py / victory_view.py / game_over_view.py
 │                                 Ecrans encore a construire (squelette d'equipe)
 
 entities/
@@ -98,7 +103,8 @@ systems/
 ├── ghost_mode.py                 Bascule Vivant <-> Fantome, fioles poison/resurrection
 ├── potion.py                     Inventaire de fioles
 ├── interactions.py               Regles d'interaction selon l'etat du joueur
-├── level_manager.py / doors_keys.py / levers.py / secrets.py / audio_manager.py
+├── level_manager.py              Chargement du plan ASCII du prototype de Thais
+├── doors_keys.py / levers.py / secrets.py / audio_manager.py
 │                                 A construire
 
 assets/
@@ -119,7 +125,7 @@ docs/                           Apercus et guides des niveaux
 |--------------------------------------------------|-------------|
 | `entities/player.py`, mouvement, collisions, PV   |  |
 | `entities/ghost.py`, `systems/ghost_mode.py`, `systems/potion.py` | Kadir |
-| `systems/level_manager.py`, `systems/doors_keys.py` | Elias |
+| `systems/level_manager.py`, `systems/doors_keys.py`, `views/game_view.py` | Thaïs |
 | `systems/levers.py`, `systems/secrets.py`         | Mélissa |
 | `entities/traps.py`                               | - |
 | `views/hud.py`, `views/menus.py`, `systems/audio_manager.py` |  |
