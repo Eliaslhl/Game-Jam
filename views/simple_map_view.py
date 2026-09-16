@@ -150,7 +150,7 @@ class SimpleMapGame:
     def event(self, key):
         if key == pygame.K_m:
             self.map_open = not self.map_open
-        elif key == pygame.K_r:
+        elif key == pygame.K_n and (self.level.won or self.level.lost):
             self.__init__()
         elif not self.map_open:
             self.level.action(key)
@@ -208,6 +208,8 @@ class SimpleMapGame:
             self.draw_map(screen)
         if level.won:
             self.draw_win(screen)
+        elif level.lost:
+            self.draw_loss(screen)
 
     def draw_souls(self, screen):
         for soul in self.souls:
@@ -263,7 +265,7 @@ class SimpleMapGame:
             if self.facing_left:
                 frame = pygame.transform.flip(frame, True, False)
             bob = int(self.elapsed * 8) % 2 if self.moving else 0
-            screen.blit(frame, (px - 5, py - 8 - bob))
+            screen.blit(frame, (px - frame.get_width() // 2, py - frame.get_height() + 4 - bob))
 
     def draw_lighting(self, screen, torch_points, px, py, is_ghost):
         self.shade.fill((4, 7, 15, 210))
@@ -394,7 +396,14 @@ class SimpleMapGame:
         veil.fill((6, 16, 22, 220))
         screen.blit(veil, (0, 0))
         self.label(screen, "SORTIE ATTEINTE", (SIZE[0] // 2 - 55, SIZE[1] // 2 - 10), GOLD, self.font)
-        self.label(screen, "R : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
+        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
+
+    def draw_loss(self, screen):
+        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
+        veil.fill((30, 8, 12, 220))
+        screen.blit(veil, (0, 0))
+        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, SIZE[1] // 2 - 10), (232, 120, 120), self.font)
+        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
 
 
 def main():

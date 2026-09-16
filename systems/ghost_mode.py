@@ -10,6 +10,7 @@ from settings import GHOST_MODE_DURATION, POISON_VIAL_START_COUNT, RESURRECTION_
 class PlayerState(Enum):
     ALIVE = auto()
     GHOST = auto()
+    DEAD = auto()
 
 
 class GhostModeController:
@@ -31,9 +32,16 @@ class GhostModeController:
         self.time_remaining = self.duration
         return True
 
-    def return_to_alive(self):
-        """Retourne la position du corps pour une resurrection sans collision."""
+    def return_to_alive(self, position=None):
+        """Ressuscite a la position actuelle du fantome si possible."""
+        if self.state is not PlayerState.GHOST or not self.resurrection_potions.drink():
+            return None
         self.state = PlayerState.ALIVE
+        self.time_remaining = 0.0
+        return self.corpse_position if position is None else position
+
+    def die(self):
+        self.state = PlayerState.DEAD
         self.time_remaining = 0.0
         return self.corpse_position
 
@@ -41,7 +49,7 @@ class GhostModeController:
         if self.state is PlayerState.GHOST:
             self.time_remaining = max(0.0, self.time_remaining - max(0.0, delta_time))
             if self.time_remaining == 0:
-                return self.return_to_alive()
+                return self.die()
         return None
 
     def can_pass_wall(self, ghost_passable: bool) -> bool:
