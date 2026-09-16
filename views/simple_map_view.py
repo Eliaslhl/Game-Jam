@@ -58,8 +58,8 @@ VISION_GHOST = 62
 
 
 class SimpleMapGame:
-    def __init__(self):
-        self.level = TrainingLevel(MAP_PATH)
+    def __init__(self, level=None):
+        self.level = level if level is not None else TrainingLevel(MAP_PATH)
         self.tiles = PixelTiles(self.level, decorate=False)
         self.torches = compute_wall_torches(self.level)
         self.tiles_ghost_surface = ghostly(self.tiles.surface)

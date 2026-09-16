@@ -1,3 +1,9 @@
+## Systeme d'enigmes
+
+`python main.py` lance le sanctuaire avec trois enigmes independantes : statues,
+chemin invisible et leviers. P pour observer en fantome, E pour agir vivant.
+[Commandes, regles et architecture](docs/enigmes.md).
+
 # Deadweight — Le Labyrinthe des Ames
 
 Jeu d'aventure/enigme 2D top-down jouable avec Pygame. Le joueur explore des
