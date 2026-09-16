@@ -5,12 +5,10 @@ effets dynamiques (ames errantes, transformation) dans `effects.py`, et les
 petits utilitaires de rendu partages avec le couloir d'entrainement dans
 `pixel_effects.py`.
 """
-import os
-import sys
 import math
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pygame
 
@@ -80,6 +78,8 @@ PANEL_BG = (18, 24, 34)
 RESURRECTION_COUNT = (150, 200, 228)
 STATUS_ALIVE_BG = (30, 40, 33)
 STATUS_GHOST_BG = (28, 42, 46)
+STATUS_DEAD_BG = (46, 20, 24)
+DEAD_STATUS = (232, 120, 120)
 
 VISION_ALIVE = 62
 VISION_GHOST = 62
@@ -124,6 +124,10 @@ class SimpleMapGame:
         self.small = pygame.font.Font(str(UI_FONT_FILE), 11)
         self.tiny = pygame.font.Font(str(UI_FONT_FILE), 9)
         self._text_commands = []
+        # Voile des ecrans de fin : (couleur RGBA, rang dans la file de textes).
+        # Tout ce qui a ete mis en file avant ce rang passe dessous - donc au
+        # second plan -, le message de fin par-dessus. Voir present().
+        self._veil = (None, 0)
         self._font_specs = {
             id(self.font): (TITLE_FONT_FILE, 13),
             id(self.small): (UI_FONT_FILE, 11),
@@ -174,11 +178,22 @@ class SimpleMapGame:
         self.camera.x = max(0, min(p.x - VIEW.w / 2, max(0, self.map_w - VIEW.w)))
         self.camera.y = max(0, min(p.y - VIEW.h / 2, max(0, self.map_h - VIEW.h)))
 
-    def label(self, screen, text, position, color=WHITE, font=None):
+    def label(self, screen, text, position, color=WHITE, font=None, align="left", valign="top"):
         """Ne dessine rien tout de suite : met le texte en file, dans le repere
         du petit canevas pixel-art. `present()` le rendra a la toute fin, a la
-        resolution finale de la fenetre (voir commentaire dans __init__)."""
-        self._text_commands.append((str(text), position, color, font or self.font, screen.get_clip()))
+        resolution finale de la fenetre (voir commentaire dans __init__).
+
+        `align` / `valign` disent ce que `position` designe : le bord gauche,
+        le centre ou le bord droit ("left" / "center" / "right"), et le haut ou
+        le milieu ("top" / "middle"). Centrer ici, sur les metriques de la
+        police de base, ne marcherait pas : le texte suit l'echelle verticale
+        de la fenetre alors que les positions suivent l'echelle horizontale, et
+        les deux different des que la fenetre n'a pas les proportions du
+        canevas. L'alignement est donc resolu dans present(), avec la taille
+        reellement rendue."""
+        self._text_commands.append(
+            (str(text), position, color, font or self.font, screen.get_clip(), align, valign)
+        )
 
     def update(self, dt, direction):
         if self.map_open:
@@ -438,14 +453,27 @@ class SimpleMapGame:
 
         pygame.draw.line(screen, DIVIDER, (x, pos["div1_y"]), (x + w, pos["div1_y"]))
 
-        status = "AME ERRANTE" if level.ghost else "VIVANT"
-        badge_bg = STATUS_GHOST_BG if level.ghost else STATUS_ALIVE_BG
-        badge_fg = GHOST_STATUS if level.ghost else WHITE
+        # Trois etats, pas deux : vivant, fantome, mort. Tant que le badge ne
+        # regardait que `ghost`, il affichait "VIVANT" sur l'ecran de mort,
+        # puisque `ghost` est faux aussi bien vivant que mort.
+        # En fantome, le compte a rebours vire progressivement au rouge quand
+        # la resurrection devient urgente : meme signal que la vignette et les
+        # secousses (views/pixel_effects.py).
+        danger = self.danger_intensity
+        if level.dead or level.lost:
+            status, badge_bg, badge_fg = "MORT", STATUS_DEAD_BG, DEAD_STATUS
+        elif level.ghost:
+            status, badge_bg = "AME ERRANTE", STATUS_GHOST_BG
+            badge_fg = lerp_color(GHOST_STATUS, DANGER_COLOR, danger)
+        else:
+            status, badge_bg, badge_fg = "VIVANT", STATUS_ALIVE_BG, WHITE
         bx, by, bw, bh = pos["badge"]
         pygame.draw.rect(screen, badge_bg, pos["badge"], border_radius=4)
         pygame.draw.rect(screen, badge_fg, pos["badge"], width=1, border_radius=4)
-        tw, th = self.small.size(status)
-        self.label(screen, status, (bx + (bw - tw) / 2, by + (bh - th) / 2), badge_fg, self.small)
+        self.label(
+            screen, status, (bx + bw / 2, by + bh / 2), badge_fg, self.small,
+            align="center", valign="middle",
+        )
 
         self.label(screen, "FIOLES", (x, pos["fioles_label_y"]), TEXT_DIM, self.tiny)
         self._draw_potion_row(screen, x, w, pos["poison_y"], POTION_COUNT, "Poison", level.mode.poison_potions.count)
@@ -454,12 +482,13 @@ class SimpleMapGame:
         )
 
         if pos["ghost_bar"] is not None:
+            bar_color = lerp_color(GHOST_BAR_FILL, DANGER_COLOR, danger)
             bar = pygame.Rect(*pos["ghost_bar"])
             pygame.draw.rect(screen, GHOST_BAR_BG, bar, border_radius=2)
             fill_w = max(0, int(bar.w * level.mode.time_remaining / level.mode.duration))
             if fill_w > 0:
-                pygame.draw.rect(screen, GHOST_BAR_FILL, (bar.x, bar.y, fill_w, bar.h), border_radius=2)
-            self.label(screen, f"Retour dans {level.mode.time_remaining:.1f}s", (x, pos["ghost_timer_y"]), GHOST_STATUS, self.tiny)
+                pygame.draw.rect(screen, bar_color, (bar.x, bar.y, fill_w, bar.h), border_radius=2)
+            self.label(screen, f"Retour dans {level.mode.time_remaining:.1f}s", (x, pos["ghost_timer_y"]), badge_fg, self.tiny)
 
         pygame.draw.line(screen, DIVIDER, (x, pos["div2_y"]), (x + w, pos["div2_y"]))
         self.label(screen, "OBJETS", (x, pos["objets_label_y"]), TEXT_DIM, self.tiny)
@@ -506,9 +535,9 @@ class SimpleMapGame:
         pygame.draw.rect(screen, color, (x, y + 1, 8, 10), border_radius=2)
         pygame.draw.rect(screen, INK, (x + 2, y, 4, 3))
         self.label(screen, label, (x + 14, y), WHITE, self.tiny)
-        count_text = str(count)
-        tw, _ = self.tiny.size(count_text)
-        self.label(screen, count_text, (x + w - tw, y), color, self.tiny)
+        # Compte cale sur le bord droit de la colonne, comme un alignement de
+        # tableau : les chiffres restent sur la meme verticale d'une ligne a l'autre.
+        self.label(screen, count, (x + w, y), color, self.tiny, align="right")
 
     def _key_pips_fit(self, total):
         pip, gap = 10, 4
@@ -528,7 +557,12 @@ class SimpleMapGame:
                     pygame.draw.rect(screen, (235, 196, 90), rect, border_radius=2)
                 else:
                     pygame.draw.rect(screen, TEXT_DIM, rect, width=1, border_radius=2)
-            self.label(screen, f"{collected}/{total}", (x, y + 14), (235, 196, 90), self.tiny)
+            # Le compte se centre sous la rangee de pions, pas sous la colonne.
+            row_w = total * (pip + gap) - gap
+            self.label(
+                screen, f"{collected}/{total}", (x + row_w / 2, y + 14),
+                (235, 196, 90), self.tiny, align="center",
+            )
         else:
             self.label(screen, f"Cles : {collected}/{total}", (x, y), (235, 196, 90), self.small)
 
@@ -552,18 +586,24 @@ class SimpleMapGame:
         self.label(screen, "CARTE (M pour fermer)", (box.x + 10, box.y + 6), GOLD, self.small)
 
     def draw_win(self, screen):
-        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
-        veil.fill((6, 16, 22, 220))
-        screen.blit(veil, (0, 0))
-        self.label(screen, "SORTIE ATTEINTE", (SIZE[0] // 2 - 55, SIZE[1] // 2 - 10), GOLD, self.font)
-        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
+        self._veil = ((6, 16, 22, 220), len(self._text_commands))
+        self.label(screen, "SORTIE ATTEINTE", (SIZE[0] // 2, SIZE[1] // 2 - 10), GOLD, self.font, align="center")
+        self.label(
+            screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2, SIZE[1] // 2 + 10),
+            WHITE, self.small, align="center",
+        )
 
     def draw_loss(self, screen):
-        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
-        veil.fill((30, 8, 12, 220))
-        screen.blit(veil, (0, 0))
-        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, SIZE[1] // 2 - 10), (232, 120, 120), self.font)
-        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
+        # Le voile n'est pas pose ici sur le canevas mais a la toute fin, sur
+        # l'ecran (voir present()) : c'est ce qui fait passer TOUT le reste au
+        # second plan - le decor, la barre du haut et la colonne de droite -
+        # au lieu de laisser le texte du HUD briller par-dessus le voile.
+        self._veil = ((30, 8, 12, 220), len(self._text_commands))
+        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2, SIZE[1] // 2 - 10), DEAD_STATUS, self.font, align="center")
+        self.label(
+            screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2, SIZE[1] // 2 + 10),
+            WHITE, self.small, align="center",
+        )
 
     def present(self, canvas, screen):
         """Deuxieme passe : blitte le petit canevas pixel-art agrandi (net,
@@ -575,7 +615,25 @@ class SimpleMapGame:
         screen.blit(pygame.transform.scale(canvas, target_size), (0, 0))
         sx = target_size[0] / SIZE[0]
         sy = target_size[1] / SIZE[1]
-        for text, position, color, font, clip in self._text_commands:
+
+        veil_color, veil_at = self._veil
+        if veil_color is None:
+            self._blit_queued_text(screen, self._text_commands, sx, sy)
+        else:
+            # Ecran de fin : le HUD passe sous le voile, le message par-dessus.
+            self._blit_queued_text(screen, self._text_commands[:veil_at], sx, sy)
+            veil = pygame.Surface(target_size, pygame.SRCALPHA)
+            veil.fill(veil_color)
+            screen.blit(veil, (0, 0))
+            self._blit_queued_text(screen, self._text_commands[veil_at:], sx, sy)
+
+        screen.set_clip(None)
+        self._text_commands.clear()
+        self._veil = (None, 0)
+
+    def _blit_queued_text(self, screen, commands, sx, sy):
+        """Rend une tranche de la file de textes a la resolution finale."""
+        for text, position, color, font, clip, align, valign in commands:
             path, base_size = self._font_specs.get(id(font), (UI_FONT_FILE, 11))
             key = (path, base_size, sy)
             scaled_font = self._scaled_fonts.get(key)
@@ -587,9 +645,15 @@ class SimpleMapGame:
             else:
                 screen.set_clip(None)
             surface = scaled_font.render(text, True, color)
-            screen.blit(surface, (position[0] * sx, position[1] * sy))
+            x, y = position[0] * sx, position[1] * sy
+            if align == "center":
+                x -= surface.get_width() / 2
+            elif align == "right":
+                x -= surface.get_width()
+            if valign == "middle":
+                y -= surface.get_height() / 2
+            screen.blit(surface, (x, y))
         screen.set_clip(None)
-        self._text_commands.clear()
 
 
 def run(screen):
@@ -647,34 +711,9 @@ def main():
         window = pygame.display.set_mode(desktop_size, pygame.NOFRAME)
         pygame.display.set_caption("Le sanctuaire - Deadweight")
 
-        canvas = pygame.Surface(SIZE)
-        game = SimpleMapGame()
-        clock = pygame.time.Clock()
-        running = True
-        while running:
-            dt = min(clock.tick(60) / 1000, 0.05)
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
-                    else:
-                        game.event(event.key)
-
-            keys = pygame.key.get_pressed()
-            direction = (
-                int(keys[pygame.K_d] or keys[pygame.K_RIGHT])
-                - int(keys[pygame.K_q] or keys[pygame.K_a] or keys[pygame.K_LEFT]),
-                int(keys[pygame.K_s] or keys[pygame.K_DOWN])
-                - int(keys[pygame.K_z] or keys[pygame.K_w] or keys[pygame.K_UP]),
-            )
-            game.update(dt, direction)
-            game.draw(canvas)
-            window.blit(pygame.transform.scale(canvas, window.get_size()), (0, 0))
-            pygame.display.flip()
-            if "--smoke-test" in sys.argv:
-                running = False
+        # Une seule boucle de jeu, celle de run() : elle passe par present(),
+        # qui est ce qui dessine reellement le texte du HUD (voir label()).
+        run(window)
     finally:
         if music_started:
             pygame.mixer.music.stop()

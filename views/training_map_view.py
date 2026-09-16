@@ -17,7 +17,6 @@ from views.pixel_effects import (
     lerp_color,
     make_glow,
 )
-from views.pixel_effects import make_glow
 from settings import (
     TITLE_FONT_FILE,
     UI_FONT_FILE,
@@ -39,6 +38,9 @@ HOLE_VOID = (18, 10, 28)
 HOLE_RIM = (172, 136, 223)
 GAME_OVER_RED = (196, 30, 30)
 RESURRECTION_COUNT = (150, 200, 228)
+DEAD_STATUS = (232, 120, 120)
+WIN_VEIL = (6, 16, 22, 220)
+LOSS_VEIL = (30, 8, 12, 220)
 
 
 class TrainingGame:
@@ -198,10 +200,6 @@ class TrainingGame:
 
         screen.set_clip(None)
         self.draw_hud(screen)
-        if level.won:
-            self.draw_win(screen)
-        elif level.lost:
-            self.draw_loss(screen)
 
     def draw_text(self, screen):
         """Deuxieme passe : tout le texte du HUD, dessine directement a la
@@ -209,9 +207,19 @@ class TrainingGame:
         petit canevas pixel-art deja agrandi et blitte dessus par l'appelant."""
         level = self.level
         self.draw_hud_text(screen)
+        if not (level.won or level.lost):
+            return
+        # Le voile des ecrans de fin est pose ici, sur l'ecran et apres le HUD,
+        # et non sur le canevas : tout ce qui precede - decor et HUD compris -
+        # passe ainsi au second plan, seul le message de fin reste en pleine
+        # lumiere. Pose sur le canevas, il aurait laisse le texte du HUD briller
+        # par-dessus, puisque celui-ci est dessine en dernier.
+        veil = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        veil.fill(WIN_VEIL if level.won else LOSS_VEIL)
+        screen.blit(veil, (0, 0))
         if level.won:
             self.draw_win_text(screen)
-        elif level.lost:
+        else:
             self.draw_loss_text(screen)
 
     def draw_hud(self, screen):
@@ -229,8 +237,15 @@ class TrainingGame:
     def draw_hud_text(self, screen):
         level = self.level
         screen.blit(self.title_surface, (8 * self.scale + self.offset[0], 5 * self.scale + self.offset[1]))
-        status = "AME ERRANTE" if level.ghost else "VIVANT"
-        self.label(screen, status, (8, 79), GHOST_STATUS if level.ghost else WHITE, self.small)
+        # Trois etats, pas deux : sans le cas "mort", l'etat affiche retombe sur
+        # "VIVANT" pendant l'ecran de mort (`ghost` y est faux, comme vivant).
+        if level.dead or level.lost:
+            status, status_color = "MORT", DEAD_STATUS
+        elif level.ghost:
+            status, status_color = "AME ERRANTE", GHOST_STATUS
+        else:
+            status, status_color = "VIVANT", WHITE
+        self.label(screen, status, (8, 79), status_color, self.small)
         self.label(screen, f"POISON {level.mode.poison_potions.count}", (SIZE[0] - 118, 79), POTION_COUNT, self.small)
         self.label(screen, f"RESUR. {level.mode.resurrection_potions.count}", (SIZE[0] - 118, 93), RESURRECTION_COUNT, self.small)
         message = level.message if level.message_time > 0 else "P : poison / R : resurrection / N : recommencer"
@@ -238,22 +253,12 @@ class TrainingGame:
             self.label(screen, line, (8, 92 + i * 11), WHITE, self.small)
         screen.blit(self.controls_surface, (8 * self.scale + self.offset[0], (SIZE[1] - 14) * self.scale + self.offset[1]))
 
-    def draw_win(self, screen):
-        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
-        veil.fill((6, 16, 22, 220))
-        screen.blit(veil, (0, 0))
-
     def draw_win_text(self, screen):
         self.label(screen, "COULOIR VALIDE", (SIZE[0] // 2 - 45, 55), GOLD, self.font)
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
 
-    def draw_loss(self, screen):
-        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
-        veil.fill((30, 8, 12, 220))
-        screen.blit(veil, (0, 0))
-
     def draw_loss_text(self, screen):
-        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, 55), (232, 120, 120), self.font)
+        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, 55), DEAD_STATUS, self.font)
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
 
 

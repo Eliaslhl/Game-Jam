@@ -6,21 +6,25 @@ from pathlib import Path
 import pygame
 from systems.training_level import TrainingLevel
 from systems.puzzle_manager import PuzzleManager
-from systems.hazards import GhostHazards
 from entities.puzzle_object import PuzzleObject
 
 MAP_PATH = Path(__file__).resolve().parents[1] / 'assets/maps/sanctuaire_enigmes.json'
+
+# Distance (en pixels) a laquelle un panneau se lit tout seul. Une case fait
+# 16 px : c'est donc un peu plus large que la portee d'interaction (23), pour
+# que l'inscription s'affiche en passant devant, sans avoir a se coller dessus.
+SIGN_READING_RANGE = 26
 
 
 class PuzzleLevel(TrainingLevel):
     _previous_path = None
     def __init__(self, path=MAP_PATH, seed=None):
-        super().__init__(path)
+        # hole_count=0 : pas de pieges dans le sanctuaire des enigmes. La seule
+        # facon de mourir reste le temps fantome epuise. (Le systeme de trous,
+        # systems/hazards.py, reste en place : il suffit de remonter ce compte
+        # pour les reactiver.)
+        super().__init__(path, hole_count=0)
         self.generate_path(seed)
-        # Le chemin invisible n'existe qu'a partir d'ici (ajoute a self.data['objects']
-        # par generate_path) : on relance les trous pour qu'aucun ne tombe dessus, sinon
-        # l'enigme du chemin deviendrait injouable (un pas obligatoire serait mortel).
-        self.holes = GhostHazards(self._floor_cells(), count=len(self.holes))
         self.puzzles = PuzzleManager(self.data['puzzles'], seed=seed)
         self.objects = [PuzzleObject.from_data(d) for d in self.data['objects']]
         # Les indices et la validation partagent exactement la meme permutation.
@@ -194,6 +198,27 @@ class PuzzleLevel(TrainingLevel):
         self.previous_path_cell = None
         self.notify('wrong','Mauvaise dalle : retour a l entree de la salle. Vos cles sont conservees.')
 
+    def read_nearby_sign(self):
+        """Les panneaux (les "?") se lisent tout seuls des qu'on s'en approche :
+        leur texte part sur le parchemin sans avoir a appuyer sur E.
+
+        Il y reste tant qu'on est devant, mais ne recouvre jamais un message qui
+        vient d'arriver (cle ramassee, coffre ouvert, mauvaise sequence) : ce
+        message-la passe d'abord, et l'inscription revient quand il s'efface.
+        Un panneau peut en revanche remplacer un autre panneau tout de suite."""
+        signs = [
+            obj for obj in self.objects
+            if obj.type == 'sign' and obj.visible_to(self)
+            and self.center(obj.cell).distance_to(self.position) <= SIGN_READING_RANGE
+        ]
+        if not signs:
+            return False
+        nearest = min(signs, key=lambda obj: self.center(obj.cell).distance_to(self.position))
+        sign_texts = {obj.text for obj in self.objects if obj.type == 'sign'}
+        if self.message_time <= 0 or self.message in sign_texts:
+            self.say(nearest.text)
+        return True
+
     def process_cell(self):
         if self.ghost:
             for obj in self.objects:
@@ -204,6 +229,10 @@ class PuzzleLevel(TrainingLevel):
             if nearby:
                 nearest=min(nearby,key=lambda o:self.center(o.cell).distance_to(self.position))
                 self.say(nearest.text)
+            else:
+                # Les indices spectraux passent avant : un panneau ne se lit que
+                # si aucune inscription fantome n'occupe deja le parchemin.
+                self.read_nearby_sign()
             return
         path = self.puzzles.puzzles['path_green']
         danger = pygame.Rect(self.data['danger_room']['rect'])
@@ -221,6 +250,7 @@ class PuzzleLevel(TrainingLevel):
             self.previous_path_cell = None
         for obj in self.objects:
             if obj.type == 'key' and obj.cell == self.cell: obj.interact(self)
+        self.read_nearby_sign()
         if self.tile(*self.cell) == 'E' and {'blue','red','green'} <= self.keys:
             self.won = True
             self.notify('solved','Trois mondes compris. Le sanctuaire vous laisse partir !')
