@@ -15,6 +15,7 @@ class PuzzleLevel(TrainingLevel):
     _previous_path = None
     def __init__(self, path=MAP_PATH, seed=None):
         super().__init__(path)
+        self.mode.auto_return_on_timeout = True
         self.generate_path(seed)
         self.puzzles = PuzzleManager(self.data['puzzles'], seed=seed)
         self.objects = [PuzzleObject.from_data(d) for d in self.data['objects']]
@@ -92,10 +93,11 @@ class PuzzleLevel(TrainingLevel):
         self.say(message)
 
     def return_to_body(self):
-        if not self.mode.resurrection_potions.drink():
+        restored = self.mode.return_to_alive()
+        if restored is None:
             self.notify('wrong','Plus de potions de resurrection. Attendez la fin du temps fantome.')
             return
-        self.position.update(self.mode.return_to_alive())
+        self.position.update(restored)
         self.cooldown = 5.0
         self.previous_path_cell = None
         self.notify('return','Retour au corps. Poison disponible dans 5 secondes.')

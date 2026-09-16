@@ -53,6 +53,9 @@ class PuzzleGame(SimpleMapGame):
         self.camera.y+=dy
 
     def event(self,key):
+        if key == pygame.K_r:
+            self.__init__()
+            return
         if self.feedback_fx.freeze_remaining>0 and key not in (pygame.K_m,pygame.K_r):
             return
         super().event(key)
@@ -216,6 +219,40 @@ class PuzzleGame(SimpleMapGame):
         super().draw_win(screen)
 
 
+def run(window):
+    """Partie dans la fenetre du menu ; le menu reste proprietaire de Pygame."""
+    fullscreen=bool(window.get_flags() & pygame.FULLSCREEN)
+    canvas=pygame.Surface(SIZE)
+    game=PuzzleGame()
+    clock=pygame.time.Clock()
+    try:
+        while True:
+            dt=min(clock.tick(60)/1000,.05)
+            for event in pygame.event.get():
+                if event.type==pygame.QUIT:
+                    return 'quit'
+                if event.type==pygame.KEYDOWN:
+                    if event.key==pygame.K_ESCAPE:
+                        return 'menu'
+                    if event.key==pygame.K_F11:
+                        fullscreen=not fullscreen
+                        window=pygame.display.set_mode((0,0) if fullscreen else (940,724), pygame.FULLSCREEN if fullscreen else 0)
+                    else:
+                        game.event(event.key)
+            k=pygame.key.get_pressed()
+            direction=(int(k[pygame.K_d] or k[pygame.K_RIGHT])-int(k[pygame.K_q] or k[pygame.K_a] or k[pygame.K_LEFT]),int(k[pygame.K_s] or k[pygame.K_DOWN])-int(k[pygame.K_z] or k[pygame.K_w] or k[pygame.K_UP]))
+            game.update(dt,direction)
+            game.draw(canvas)
+            game.present(canvas,window)
+            pygame.display.flip()
+            if '--smoke-test' in sys.argv:
+                return 'menu'
+    finally:
+        # Ne pas laisser la reverberation de la partie jouer sur le menu.
+        for sound in game.feedback_fx.sounds.values():
+            sound.stop()
+
+
 def main():
     if '--smoke-test' in sys.argv:
         os.environ.setdefault('SDL_VIDEODRIVER','dummy')
@@ -225,24 +262,10 @@ def main():
         fullscreen='--windowed' not in sys.argv and '--smoke-test' not in sys.argv
         window=pygame.display.set_mode((0,0) if fullscreen else (940,724), pygame.FULLSCREEN if fullscreen else 0)
         pygame.display.set_caption('Le Sanctuaire - Enigmes')
-        canvas=pygame.Surface(SIZE)
-        game=PuzzleGame(); clock=pygame.time.Clock(); running=True
-        while running:
-            dt=min(clock.tick(60)/1000,.05)
-            for event in pygame.event.get():
-                if event.type==pygame.QUIT:running=False
-                elif event.type==pygame.KEYDOWN:
-                    if event.key==pygame.K_ESCAPE:running=False
-                    elif event.key==pygame.K_F11:
-                        fullscreen=not fullscreen
-                        window=pygame.display.set_mode((0,0) if fullscreen else (940,724), pygame.FULLSCREEN if fullscreen else 0)
-                    else:game.event(event.key)
-            k=pygame.key.get_pressed()
-            direction=(int(k[pygame.K_d] or k[pygame.K_RIGHT])-int(k[pygame.K_q] or k[pygame.K_a] or k[pygame.K_LEFT]),int(k[pygame.K_s] or k[pygame.K_DOWN])-int(k[pygame.K_z] or k[pygame.K_w] or k[pygame.K_UP]))
-            game.update(dt,direction);game.draw(canvas);game.present(canvas,window)
-            pygame.display.flip()
-            if '--smoke-test' in sys.argv:running=False
-    finally:pygame.quit()
+        run(window)
+    finally:
+        pygame.quit()
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    main()

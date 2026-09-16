@@ -1,4 +1,4 @@
-﻿"""Verification des regles fantome et du parcours Pygame de Kadir."""
+"""Verification des regles fantome et du parcours Pygame de Kadir."""
 import os
 import unittest
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -11,7 +11,7 @@ from test_map.map_test_kadir import TestMapKadir, PLAN
 
 class GhostTests(unittest.TestCase):
     def test_potions_timer_and_return(self):
-        mode = GhostModeController()
+        mode = GhostModeController(auto_return_on_timeout=True)
         for _ in range(3):
             self.assertTrue(mode.enter_ghost_mode((100, 100)))
             count = mode.potions.count

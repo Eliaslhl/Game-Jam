@@ -17,7 +17,7 @@ from settings import (
     TEXT_DIM,
 )
 from views import training_map_view
-from views import simple_map_view
+from views import puzzle_view
 
 MENU_ITEMS = [
     ("Jouer", "play"),
@@ -129,7 +129,8 @@ def run(screen: pygame.Surface) -> None:
             if action == "play":
                 # Plein ecran pour la partie, puis retour a la fenetre du menu.
                 fullscreen = _fullscreen_window()
-                simple_map_view.run(fullscreen)
+                if puzzle_view.run(fullscreen) == 'quit':
+                    return
                 screen = _new_window()
                 scene = MenuScene(screen)
             elif action == "tutorial":
