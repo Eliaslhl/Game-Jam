@@ -40,7 +40,8 @@ class MenuPuzzleIntegrationTests(unittest.TestCase):
         self.assertEqual(len(games[0].level.puzzles.puzzles),3)
         self.assertEqual(games[0].level.mode.resurrection_potions.count,3)
         self.assertTrue(pygame.get_init())
-        self.assertEqual(pygame.display.get_surface().get_size(),(SCREEN_WIDTH,SCREEN_HEIGHT))
+        # Le menu conserve le plein ecran courant, fourni ici par le mock.
+        self.assertEqual(pygame.display.get_surface().get_size(),(940,724))
 
     def test_escape_returns_to_menu_without_quitting_pygame(self):
         pygame.event.post(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_ESCAPE))
