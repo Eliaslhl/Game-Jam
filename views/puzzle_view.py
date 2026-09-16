@@ -29,8 +29,9 @@ from views.simple_map_view import (
     POTION_COUNT,
 )
 
-COLORS = {'blue':(105,193,255),'red':(245,120,119),'green':(133,226,162),'silver':(218,230,244)}
-KEY_NAMES = {'blue':'Bleue','red':'Rouge','green':'Verte','silver':'Argent'}
+COLORS = {'blue':(105,193,255),'red':(245,120,119),'green':(133,226,162),'silver':(218,230,244),
+          'gold':(255,208,64)}
+KEY_NAMES = {'blue':'Bleue','red':'Rouge','green':'Verte','silver':'Argent','gold':'Or'}
 
 # Parchemin des messages (voir PuzzleGame.draw_parchment).
 PARCHMENT_BODY = (216, 192, 149)
@@ -61,7 +62,7 @@ class PuzzleGame(SimpleMapGame):
         simulation_dt=self.feedback_fx.advance(dt)
         super().update(simulation_dt,direction)
         self.drain_events()
-        silent = self.level.trial_room is not None
+        silent = self.level.trial_room is not None or self.level.special_room is not None
         if pygame.mixer.get_init() and silent != self.music_paused:
             if silent: pygame.mixer.music.pause()
             else: pygame.mixer.music.unpause()
@@ -100,7 +101,9 @@ class PuzzleGame(SimpleMapGame):
         if not self.map_open and not self.level.won:
             success=next((p for p in reversed(self.feedback_fx.pulses) if p.kind=='solved' and .3<p.age<1.9),None)
             if success:
-                title={'tomb':'LE SECRET DES TOMBES','statue':'LE GARDIEN SE REVEILLE','wall':'LA PIERRE SE DECHIRE'}.get(success.puzzle_id,'LE SANCTUAIRE REPOND')
+                title={'tomb':'LE SECRET DES TOMBES','statue':'LE GARDIEN SE REVEILLE','wall':'LA PIERRE SE DECHIRE',
+                       'statues_sp':'LES QUATRE STATUES REPONDENT','path_sp':'LE CHEMIN SE REVELE'
+                       }.get(success.puzzle_id,'LE SANCTUAIRE REPOND')
                 width=self.small.size(title)[0]+20
                 rect=pygame.Rect((VIEW.w-width)//2,VIEW.y+10,width,22)
                 veil=pygame.Surface(rect.size,pygame.SRCALPHA);veil.fill((12,18,27,210))
@@ -118,18 +121,20 @@ class PuzzleGame(SimpleMapGame):
 
     def draw_special_tiles(self,screen,level):
         super().draw_special_tiles(screen,level)
-        for obj in sorted(level.objects,key=lambda o: 0 if o.type=='chest' else (2 if o.type=='key' else 1)):
+        for obj in sorted(level.objects,key=lambda o: -1 if o.type=='plateau' else (0 if o.type=='chest' else (2 if o.type=='key' else 1))):
             if not obj.visible_to(level): continue
-            if obj.type in ('clue','footprint') and level.center(obj.cell).distance_to(level.position)>52: continue
+            if obj.type in ('clue','footprint') and level.center(obj.cell).distance_to(level.position)>90: continue
             x,y=self.point(level.center(obj.cell))
             if obj.type in ('tomb','statue','wall','socket'):
+                target=level.targets.get(obj.puzzle_id)
                 spectral = level.ghost and (
-                    (obj.type=='tomb' and obj.id=='tomb_'+str(level.targets['tomb'])) or
-                    (obj.type=='wall' and obj.id=='wall_'+str(level.targets['wall'])) or
-                    (obj.type=='socket' and obj.cell==level.targets['statue']))
+                    (obj.type=='tomb' and obj.id==obj.puzzle_id+'_'+str(target)) or
+                    (obj.type=='wall' and obj.id==obj.puzzle_id+'_'+str(target)) or
+                    (obj.type=='socket' and obj.cell==target))
                 if obj.type=='statue':
-                    if level.statue_motion:
-                        start,end,when=level.statue_motion
+                    motion=level.statue_motion.get(obj.id)
+                    if motion:
+                        start,end,when=motion
                         t=min(1,max(0,(level.time-when)/.22))
                         x,y=self.point(level.center(start).lerp(level.center(end),t*t*(3-2*t)))
                     pygame.draw.ellipse(screen,(35,40,48),(x-7,y+3,14,5))
@@ -151,8 +156,9 @@ class PuzzleGame(SimpleMapGame):
                     pygame.draw.rect(screen,(109,108,113),(x-8,y-8,16,16))
                     for offset in (-7,0,7): pygame.draw.line(screen,(53,56,65),(x-8,y+offset),(x+7,y+offset))
                     pygame.draw.line(screen,(53,56,65),(x,y-7),(x,y+7))
-                    if obj.id=='wall_'+str(level.targets['wall']) and level.wall_hits:
-                        pygame.draw.lines(screen,(22,24,31),False,[(x-1,y-7),(x+2,y-2),(x-2,y+2),(x+2,y+6)],level.wall_hits)
+                    hits=level.wall_hits.get(obj.puzzle_id,0)
+                    if obj.id==obj.puzzle_id+'_'+str(target) and hits:
+                        pygame.draw.lines(screen,(22,24,31),False,[(x-1,y-7),(x+2,y-2),(x-2,y+2),(x+2,y+6)],hits)
                 if spectral:
                     color=(147,242,239)
                     radius=9+round(2*math.sin(self.elapsed*4))
@@ -186,6 +192,33 @@ class PuzzleGame(SimpleMapGame):
             elif obj.type=='sign':
                 pygame.draw.rect(screen,(112,94,66),(x-5,y-5,10,8))
                 self.label(screen,'?',(x,y-1),WHITE,self.small,align="center",valign="middle")
+            elif obj.type=='order_statue':
+                pygame.draw.ellipse(screen,(35,40,48),(x-7,y+3,14,5))
+                pygame.draw.rect(screen,(120,110,150),(x-5,y-5,10,11))
+                pygame.draw.circle(screen,(196,186,216),(x,y-9),5)
+                pygame.draw.line(screen,GOLD,(x-3,y-10),(x+3,y-10),2)
+                if level.ghost and level.center(obj.cell).distance_to(level.position)<=40:
+                    color=(147,242,239)
+                    radius=9+round(2*math.sin(self.elapsed*4))
+                    pygame.draw.ellipse(screen,color,(x-radius,y-5,radius*2,10),1)
+                    rank=level.puzzles.puzzles[obj.puzzle_id].solution.index(obj.id)+1
+                    self.label(screen,str(rank),(x,y-24),color,self.small,align="center")
+            elif obj.type=='plateau':
+                # Dalle brune du plateau : couleur nettement distincte du sol
+                # du sanctuaire, visible vivant comme fantome (le plateau est
+                # toujours la, seul le bon chemin dessus reste un secret).
+                pygame.draw.rect(screen,(58,38,24),(x-8,y-6,16,13))
+                pygame.draw.rect(screen,(101,72,44),(x-7,y-6,14,11))
+                pygame.draw.line(screen,(133,98,60),(x-7,y-6),(x+7,y-6))
+                pygame.draw.rect(screen,(84,58,36),(x-7,y-6,14,11),1)
+            elif obj.type=='footprint':
+                color=(66,140,224)
+                pulse=(math.sin(self.elapsed*3+obj.cell[0]*1.3+obj.cell[1]*1.7)+1)/2
+                glow=pygame.Surface((20,16),pygame.SRCALPHA)
+                pygame.draw.ellipse(glow,(*color,round(60+80*pulse)),(0,0,20,16))
+                screen.blit(glow,(x-10,y-9))
+                pygame.draw.ellipse(screen,color,(x-4,y-4,4,6))
+                pygame.draw.ellipse(screen,color,(x+1,y-1,4,6))
 
     def draw_chest(self,screen,obj,x,y):
         age=self.feedback_fx.age('solved',puzzle_id=obj.puzzle_id)
@@ -218,7 +251,7 @@ class PuzzleGame(SimpleMapGame):
     def _puzzle_sidebar_layout(self):
         """Meme esprit que SimpleMapGame._sidebar_layout() (positions partagees,
         badges/icones/pips) mais avec le contenu propre au mode enigmes :
-        recharge du poison, cles sur 3, indice courant, controles."""
+        recharge du poison, une ligne par cle de la partie, controles."""
         level = self.level
         x = SIDEBAR.x + 10
         w = SIDEBAR_W - 20
@@ -325,7 +358,11 @@ class PuzzleGame(SimpleMapGame):
         for i, key_id in enumerate(self.key_ids()):
             y = pos["keys_y"] + i * 12
             color = COLORS.get(key_id, GOLD)
-            obtenue = key_id in level.keys
+            # L'argentee est une ressource consommable (PuzzleLevel.silver_keys),
+            # pas un badge permanent dans level.keys : elle s'allume tant qu'on
+            # en tient une en poche, s'eteint des qu'elle est depensee, meme si
+            # d'autres cles argentees existent encore ailleurs sur la carte.
+            obtenue = level.silver_keys > 0 if key_id == 'silver' else key_id in level.keys
             pastille = pygame.Rect(x, y + 1, 8, 8)
             if obtenue:
                 pygame.draw.rect(screen, color, pastille, border_radius=2)
@@ -349,10 +386,19 @@ class PuzzleGame(SimpleMapGame):
 
     def key_ids(self):
         """Les cles de la partie, dans l'ordre des epreuves. Les deux premieres
-        couleurs sont tirees au sort a chaque partie et la derniere est toujours
+        couleurs sont tirees au sort a chaque partie et la troisieme est toujours
         l'argentee (voir PuzzleLevel.__init__) : la colonne doit donc lire la
-        partie en cours, pas une liste de couleurs ecrite en dur."""
-        return [obj.key_id for obj in self.level.objects if obj.type == 'key']
+        partie en cours, pas une liste de couleurs ecrite en dur.
+
+        Chaque epreuve speciale reussie fait apparaitre un nouvel objet-cle
+        argentee (pour retenter sa chance sur une autre salle) : on deduplique
+        par id, sinon "Argent" s'afficherait en double ou triple en cours de
+        partie au lieu d'une seule ligne stable."""
+        seen = []
+        for obj in self.level.objects:
+            if obj.type == 'key' and obj.key_id not in seen:
+                seen.append(obj.key_id)
+        return seen
 
     def _wrap_to_width(self, text, font, width):
         """Coupe le texte en lignes qui tiennent dans `width` (repere du canevas),

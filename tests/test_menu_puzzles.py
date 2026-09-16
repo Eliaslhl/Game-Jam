@@ -37,7 +37,7 @@ class MenuPuzzleIntegrationTests(unittest.TestCase):
             menu_view.run(self.screen)
         self.assertEqual(len(games),1)
         self.assertIsInstance(games[0].level,PuzzleLevel)
-        self.assertEqual(len(games[0].level.puzzles.puzzles),3)
+        self.assertEqual(len(games[0].level.puzzles.puzzles),5)
         self.assertEqual(games[0].level.mode.resurrection_potions.count,3)
         self.assertTrue(pygame.get_init())
         # Le menu conserve le plein ecran courant, fourni ici par le mock.
