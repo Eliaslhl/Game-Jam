@@ -51,7 +51,11 @@ class PuzzleTests(unittest.TestCase):
         chest=next(o for o in level.objects if o.id==pid+'_chest')
         walk(level,chest.cell);level.action(pygame.K_e);level.update(.7)
         self.assertEqual(chest.state,'open')
-        self.assertIn(level.puzzles.puzzles[pid].reward['id'],level.keys)
+        reward=level.puzzles.puzzles[pid].reward['id']
+        if reward=='silver':
+            self.assertGreaterEqual(level.silver_keys,1)
+        else:
+            self.assertIn(reward,level.keys)
         before=level.mode.poison_potions.count
         self.assertEqual(chest.interact(level),'locked')
         self.assertEqual(level.mode.poison_potions.count,before)
@@ -76,8 +80,8 @@ class PuzzleTests(unittest.TestCase):
                     walk(level,(x-1,y) if next_pid=='wall' else (x,y-1))
                     level.action(pygame.K_e)
                     self.assertEqual(door.state,'open')
-            self.assertIn('silver',level.keys)
-            self.assertEqual(len(level.keys),3)
+            self.assertEqual(level.silver_keys,1)
+            self.assertEqual(len(level.keys),2)
             self.assertEqual(len(level.puzzles.rewards),3)
             self.assertFalse(level.won)
         self.assertEqual(len(orders),6)
@@ -96,7 +100,7 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(wrong.interact(level),'wrong')
         self.assertFalse(level.puzzles.puzzles['tomb'].solved)
         wall=next(o for o in level.objects if o.type=='wall' and o.id!='wall_'+str(level.targets['wall']))
-        self.assertEqual(wall.interact(level),'wrong');self.assertEqual(level.wall_hits,0)
+        self.assertEqual(wall.interact(level),'wrong');self.assertEqual(level.wall_hits.get('wall',0),0)
         level.action(pygame.K_p);level.position.update(level.center(wrong.cell))
         level.action(pygame.K_RETURN)
         self.assertFalse(level.ghost);self.assertFalse(level.blocked(level.position))
