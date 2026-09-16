@@ -63,7 +63,7 @@ class TrainingGame:
         # Textes qui ne changent jamais : rendus une seule fois plutot qu'a chaque frame.
         self.title_surface = self.font.render("COULOIR D'ENTRAINEMENT", True, GOLD)
         self.controls_surface = self.small.render(
-            "ZQSD / fleches : bouger   P : poison   R : vie   N : recommencer", True, (136, 149, 157)
+            "ZQSD / fleches : bouger", True, (136, 149, 157)
         )
 
     def _add_bottom_wall_torches(self):
@@ -193,8 +193,11 @@ class TrainingGame:
             bar_color = lerp_color((172, 136, 223), DANGER_COLOR, self.danger_intensity)
             pygame.draw.rect(screen, (43, 48, 63), (70, 80, 80, 4))
             pygame.draw.rect(screen, bar_color, (70, 80, int(80 * level.mode.time_remaining / level.mode.duration), 4))
-        message = level.message if level.message_time > 0 else "P : poison / R : resurrection / N : recommencer"
-        for i, line in enumerate(textwrap.wrap(message, 60)):
+        if level.message_time > 0:
+            lines = textwrap.wrap(level.message, 30)
+        else:
+            lines = ["P : poison", "R : resurrection", "N : recommencer"]
+        for i, line in enumerate(lines):
             self.label(screen, line, (8, 92 + i * 11), WHITE, self.small)
         screen.blit(self.controls_surface, (8, SIZE[1] - 14))
 
