@@ -20,6 +20,7 @@ class GhostModeController:
         self.auto_return_on_timeout = auto_return_on_timeout
         self.time_remaining = 0.0
         self.corpse_position = None
+        self.corpse_positions = []
         # Deux fioles distinctes : le poison fait mourir (-> fantome), la
         # resurrection ramene a la vie. Independantes l'une de l'autre.
         self.poison_potions = PotionInventory(POISON_VIAL_START_COUNT)
@@ -29,6 +30,7 @@ class GhostModeController:
         if self.state is PlayerState.GHOST or not self.poison_potions.drink():
             return False
         self.corpse_position = tuple(position)
+        self.corpse_positions.append(self.corpse_position)
         self.state = PlayerState.GHOST
         self.time_remaining = self.duration
         return True

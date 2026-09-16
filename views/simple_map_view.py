@@ -34,11 +34,13 @@ from views.map_theme import (
     room_at,
 )
 from views.effects import (
+    BLOOD_COLOR,
     DUST_COLOR,
     DUST_DISPERSE_RADIUS,
     DUST_DISPERSE_STRENGTH,
     SMOKE_COLOR,
     TransformEffect,
+    build_corpse_sprite,
     build_soul_sprite,
     generate_dust_motes,
     make_souls,
@@ -89,6 +91,7 @@ class SimpleMapGame:
         self.yurei = YureiWalk()
         self.ghost_frames = [pygame.transform.scale(f, (13, 23)) for f in self.yurei.frames]
         self.soul_sprite = build_soul_sprite()
+        self.corpse_sprite = build_corpse_sprite()
         self.souls = make_souls()
         self.transform_effect = None
         self.was_ghost = False
@@ -205,9 +208,10 @@ class SimpleMapGame:
         if level.ghost:
             self.draw_holes(screen, level)
 
-        if level.mode.corpse_position is not None:
-            cx, cy = self.point(level.mode.corpse_position)
-            pygame.draw.ellipse(screen, (118, 105, 109), (cx - 6, cy - 2, 12, 5))
+        corpse = self.corpse_sprite
+        for corpse_position in level.mode.corpse_positions:
+            cx, cy = self.point(corpse_position)
+            screen.blit(corpse, (cx - corpse.get_width() // 2, cy - corpse.get_height() // 2 + 4))
 
         px, py = self.point(level.position)
         self.draw_player(screen, level, px, py)
@@ -370,6 +374,12 @@ class SimpleMapGame:
             dist = radius * 0.7
             dx, dy = math.cos(angle) * dist, math.sin(angle) * dist - p * 12
             pygame.draw.circle(screen, (*color, alpha), (round(x + dx), round(y + dy)), 2)
+        if effect.expanding:
+            for ox, oy, vx, vy, size in effect.blood:
+                bx = round(x + ox + vx * p)
+                by = round(y + oy + vy * p + 22 * p * p)
+                blood_alpha = max(0, round(230 * (1 - p)))
+                pygame.draw.circle(screen, (*BLOOD_COLOR, blood_alpha), (bx, by), max(1, round(size)))
 
     def draw_top_bar(self, screen):
         pygame.draw.rect(screen, INK, (0, 0, PLAY_W, TOP_BAR_H))

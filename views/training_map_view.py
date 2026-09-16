@@ -17,6 +17,7 @@ from views.pixel_effects import (
     lerp_color,
     make_glow,
 )
+from views.effects import build_corpse_sprite
 
 SIZE = (320, 150)
 VIEW = pygame.Rect(0, 24, 320, 48)
@@ -42,6 +43,7 @@ class TrainingGame:
         self.small = pygame.font.Font(None, 15)
         self.yurei = YureiWalk()
         self.ghost_frames = [pygame.transform.scale(f, (13, 23)) for f in self.yurei.frames]
+        self.corpse_sprite = build_corpse_sprite()
         self.elapsed = 0.0
         self.facing_left = False
         self.moving = False
@@ -133,9 +135,10 @@ class TrainingGame:
                 hpx, hpy = self.point(level.center((hx, hy)))
                 pygame.draw.circle(screen, HOLE_VOID, (hpx, hpy), 7)
                 pygame.draw.circle(screen, HOLE_RIM, (hpx, hpy), 7, 1)
-        if level.mode.corpse_position is not None:
-            cx, cy = self.point(level.mode.corpse_position)
-            pygame.draw.ellipse(screen, (118, 105, 109), (cx - 6, cy - 2, 12, 5))
+        corpse = self.corpse_sprite
+        for corpse_position in level.mode.corpse_positions:
+            cx, cy = self.point(corpse_position)
+            screen.blit(corpse, (cx - corpse.get_width() // 2, cy - corpse.get_height() // 2 + 4))
         px, py = self.point(level.position)
         pygame.draw.ellipse(screen, (12, 19, 27), (px - 6, py + 2, 12, 5))
         if level.ghost:

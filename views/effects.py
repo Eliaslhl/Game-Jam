@@ -10,6 +10,7 @@ import pygame
 from views.pixel_effects import build_sprite
 
 TRANSFORM_DURATION = 0.5
+BLOOD_COLOR = (176, 35, 43)
 
 # Poussiere/fumee ambiantes : gris, plus grosses/denses dans les couloirs.
 DUST_COLOR = (200, 205, 215)
@@ -36,6 +37,24 @@ def build_soul_sprite():
     return build_sprite(GHOST_ROWS, SOUL_PALETTE)
 
 
+def build_corpse_sprite():
+    """Petit cadavre aplati, rendu comme un element de decor traversable."""
+    rows = [
+        "..oo..oo..",
+        ".osssssso.",
+        "oswwsswwoo",
+        "osssssssso",
+        ".oooooooo.",
+    ]
+    palette = {
+        ".": (0, 0, 0, 0),
+        "o": (27, 23, 30, 255),
+        "s": (91, 73, 82, 255),
+        "w": (164, 141, 145, 255),
+    }
+    return build_sprite(rows, palette)
+
+
 def make_souls():
     return [WanderingSoul(path, speed=22 + i * 4) for i, path in enumerate(SOUL_PATROLS)]
 
@@ -47,6 +66,11 @@ class TransformEffect:
         self.position = pygame.Vector2(position)
         self.expanding = expanding
         self.elapsed = 0.0
+        rng = random.Random(round(self.position.x * 17 + self.position.y * 31))
+        self.blood = [
+            (rng.uniform(-7, 7), rng.uniform(-4, 3), rng.uniform(-18, 18), rng.uniform(-30, -10), rng.uniform(0.8, 1.5))
+            for _ in range(12)
+        ]
 
     def update(self, dt):
         self.elapsed += dt
