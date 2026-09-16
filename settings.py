@@ -1,14 +1,25 @@
-"""Constantes globales du jeu."""
+# Responsable : à assigner — constantes partagées par tout le jeu
 
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720
-SCREEN_TITLE = "Deadweight"
+TILE_SIZE = 64
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+SCREEN_TITLE = "Deadweight"  # à remplacer par le nom retenu par l'équipe
 
-TILE_SIZE = 32
+# Types de tuiles du labyrinthe (un caractère = une case, dans les plans de niveau)
+VIDE = "."
+MUR = "#"              # infranchissable, vivant ou fantôme
+MUR_FISSURE = "~"      # franchissable uniquement en fantôme
+PORTE = "P"            # franchissable uniquement vivant (et si déverrouillée)
+CLE = "C"              # ramassable uniquement vivant
+LEVIER = "L"           # activable uniquement vivant
+FIOLE = "F"
+SORTIE = "S"           # fin du niveau, nécessite une clé
 
-PLAYER_SPEED = 4
-PLAYER_MAX_HP = 100
+# Chaque fiole de poison a une fiole de vie correspondante.
+FIOLES_DEPART = 3
+POISON_VIAL_START_COUNT = FIOLES_DEPART
+LIFE_VIAL_START_COUNT = POISON_VIAL_START_COUNT
 
+# Difficulté = temps limite pour sortir du labyrinthe (en secondes)
+TEMPS_LIMITE_NIVEAU_1 = 90
 GHOST_MODE_DURATION = 10.0
-GHOST_MODE_SPEED = 5
-POISON_VIAL_START_COUNT = 3
