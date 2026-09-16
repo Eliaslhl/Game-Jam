@@ -21,7 +21,7 @@ class FinalLevel:
             raise ValueError('Le plan doit etre rectangulaire')
         self.tile_size = self.data['tile_size']
         self.position = self.center(self.data['spawn'])
-        self.mode = GhostModeController(self.data['ghost_duration'])
+        self.mode = GhostModeController(self.data['ghost_duration'], auto_return_on_timeout=True)
         self.seals, self.doors, self.keys, self.picked = set(), set(), set(), set()
         self.explored = set()
         self.discoveries = set()

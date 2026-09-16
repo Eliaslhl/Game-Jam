@@ -1,0 +1,409 @@
+{
+  "tile_size": 16,
+  "spawn": [
+    25,
+    43
+  ],
+  "ghost_duration": 10.0,
+  "grid": [
+    "###################################################",
+    "###################################################",
+    "###################################################",
+    "###################################################",
+    "###################################################",
+    "######################.......######################",
+    "######################...E...######################",
+    "######################.......######################",
+    "######################.......######################",
+    "#########################D#########################",
+    "##########......######.......#####......###########",
+    "##########......#########.########......###########",
+    "##########......#########.########......###########",
+    "##########......#########.########......###########",
+    "##########......#########.########......###########",
+    "##########......#########.########......###########",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#####.......#.........Y...............#.....#.#####",
+    "#####.......##########.......##########.....#.#####",
+    "#####.......##########.......##########.....Y.#####",
+    "#####.................Y.....................#.#####",
+    "#####.......##########.......##########.....#.#####",
+    "#####.......##########.......##########.....#.#####",
+    "#############.........................#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "#############.###########.###########.#############",
+    "##########......#########.#########.....###########",
+    "##########......#########.#########.....###########",
+    "##########......#########.#########.....###########",
+    "##########......#########.#########.....###########",
+    "##########......#########.#########.....###########",
+    "##########......######.......##########.###########",
+    "######################.......######################",
+    "######################.......######################",
+    "######################.......######################",
+    "######################.......######################",
+    "######################.......######################",
+    "###################################################",
+    "###################################################",
+    "###################################################",
+    "###################################################",
+    "###################################################",
+    "###################################################"
+  ],
+  "objects": [
+    {
+      "id": "statue_1",
+      "type": "statue",
+      "cell": [
+        11,
+        35
+      ],
+      "puzzle_id": "statues_blue",
+      "text": "1"
+    },
+    {
+      "id": "number_1",
+      "type": "clue",
+      "cell": [
+        11,
+        34
+      ],
+      "puzzle_id": "statues_blue",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_target": "statue_1"
+    },
+    {
+      "id": "statue_2",
+      "type": "statue",
+      "cell": [
+        14,
+        35
+      ],
+      "puzzle_id": "statues_blue",
+      "text": "2"
+    },
+    {
+      "id": "number_2",
+      "type": "clue",
+      "cell": [
+        14,
+        34
+      ],
+      "puzzle_id": "statues_blue",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_target": "statue_2"
+    },
+    {
+      "id": "statue_3",
+      "type": "statue",
+      "cell": [
+        11,
+        38
+      ],
+      "puzzle_id": "statues_blue",
+      "text": "3"
+    },
+    {
+      "id": "number_3",
+      "type": "clue",
+      "cell": [
+        11,
+        37
+      ],
+      "puzzle_id": "statues_blue",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_target": "statue_3"
+    },
+    {
+      "id": "statue_4",
+      "type": "statue",
+      "cell": [
+        14,
+        38
+      ],
+      "puzzle_id": "statues_blue",
+      "text": "4"
+    },
+    {
+      "id": "number_4",
+      "type": "clue",
+      "cell": [
+        14,
+        37
+      ],
+      "puzzle_id": "statues_blue",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_target": "statue_4"
+    },
+    {
+      "id": "blue_key",
+      "type": "key",
+      "cell": [
+        13,
+        37
+      ],
+      "puzzle_id": "statues_blue",
+      "key_id": "blue"
+    },
+    {
+      "id": "order_c",
+      "type": "clue",
+      "cell": [
+        45,
+        22
+      ],
+      "puzzle_id": "levers_red",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_index": 0
+    },
+    {
+      "id": "order_a",
+      "type": "clue",
+      "cell": [
+        45,
+        24
+      ],
+      "puzzle_id": "levers_red",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_index": 1
+    },
+    {
+      "id": "order_b",
+      "type": "clue",
+      "cell": [
+        45,
+        27
+      ],
+      "puzzle_id": "levers_red",
+      "visible_state": "ghost",
+      "interaction_allowed": false,
+      "text": "",
+      "clue_index": 2
+    },
+    {
+      "id": "lever_A",
+      "type": "lever",
+      "cell": [
+        40,
+        23
+      ],
+      "puzzle_id": "levers_red",
+      "text": "A"
+    },
+    {
+      "id": "lever_B",
+      "type": "lever",
+      "cell": [
+        42,
+        25
+      ],
+      "puzzle_id": "levers_red",
+      "text": "B"
+    },
+    {
+      "id": "lever_C",
+      "type": "lever",
+      "cell": [
+        40,
+        27
+      ],
+      "puzzle_id": "levers_red",
+      "text": "C"
+    },
+    {
+      "id": "red_key",
+      "type": "key",
+      "cell": [
+        41,
+        25
+      ],
+      "puzzle_id": "levers_red",
+      "key_id": "red"
+    },
+    {
+      "id": "green_key",
+      "type": "key",
+      "cell": [
+        39,
+        39
+      ],
+      "puzzle_id": "path_green",
+      "key_id": "green"
+    },
+    {
+      "id": "final_door",
+      "type": "door",
+      "cell": [
+        25,
+        9
+      ],
+      "required_keys": [
+        "blue",
+        "red",
+        "green"
+      ]
+    },
+    {
+      "id": "blue_door",
+      "type": "door",
+      "cell": [
+        13,
+        16
+      ],
+      "required_keys": [
+        "blue"
+      ]
+    },
+    {
+      "id": "statues_hint",
+      "type": "sign",
+      "cell": [
+        12,
+        34
+      ],
+      "text": "Quatre statues, quatre rangs. Les morts voient l ordre. E pour activer une statue."
+    },
+    {
+      "id": "path_hint",
+      "type": "sign",
+      "cell": [
+        37,
+        32
+      ],
+      "text": "Les dalles se ressemblent. Observez les empreintes en fantome, puis suivez-les vivant."
+    },
+    {
+      "id": "levers_hint",
+      "type": "sign",
+      "cell": [
+        39,
+        25
+      ],
+      "text": "Trois leviers, trois inscriptions derriere la fissure. Observez, puis revenez agir avec E."
+    },
+    {
+      "id": "statues_blue_chest",
+      "type": "chest",
+      "cell": [
+        13,
+        37
+      ],
+      "puzzle_id": "statues_blue",
+      "state": "hidden",
+      "loot": {
+        "poison": 1,
+        "resurrection": 1
+      }
+    },
+    {
+      "id": "levers_red_chest",
+      "type": "chest",
+      "cell": [
+        41,
+        25
+      ],
+      "puzzle_id": "levers_red",
+      "state": "hidden",
+      "loot": {
+        "poison": 1,
+        "resurrection": 1
+      }
+    },
+    {
+      "id": "path_green_chest",
+      "type": "chest",
+      "cell": [
+        39,
+        39
+      ],
+      "puzzle_id": "path_green",
+      "state": "hidden",
+      "loot": {
+        "poison": 1,
+        "resurrection": 1
+      }
+    }
+  ],
+  "puzzles": [
+    {
+      "id": "statues_blue",
+      "type": "sequence",
+      "required_clues": [
+        "number_1",
+        "number_2",
+        "number_3",
+        "number_4"
+      ],
+      "reward": {
+        "type": "key",
+        "id": "blue"
+      },
+      "members": [
+        "statue_1",
+        "statue_2",
+        "statue_3",
+        "statue_4"
+      ]
+    },
+    {
+      "id": "path_green",
+      "type": "path",
+      "required_clues": [],
+      "reward": {
+        "type": "key",
+        "id": "green"
+      },
+      "generation": "random_garden_path"
+    },
+    {
+      "id": "levers_red",
+      "type": "sequence",
+      "required_clues": [
+        "order_c",
+        "order_a",
+        "order_b"
+      ],
+      "reward": {
+        "type": "key",
+        "id": "red"
+      },
+      "members": [
+        "lever_A",
+        "lever_B",
+        "lever_C"
+      ]
+    }
+  ],
+  "danger_room": {
+    "rect": [
+      35,
+      34,
+      5,
+      5
+    ],
+    "reset_cell": [
+      37,
+      33
+    ]
+  }
+}

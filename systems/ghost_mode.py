@@ -14,9 +14,10 @@ class PlayerState(Enum):
 
 
 class GhostModeController:
-    def __init__(self, duration: float = GHOST_MODE_DURATION) -> None:
+    def __init__(self, duration: float = GHOST_MODE_DURATION, *, auto_return_on_timeout: bool = False) -> None:
         self.state = PlayerState.ALIVE
         self.duration = duration
+        self.auto_return_on_timeout = auto_return_on_timeout
         self.time_remaining = 0.0
         self.corpse_position = None
         # Deux fioles distinctes : le poison fait mourir (-> fantome), la
@@ -32,9 +33,11 @@ class GhostModeController:
         self.time_remaining = self.duration
         return True
 
-    def return_to_alive(self, position=None):
+    def return_to_alive(self, position=None, *, consume_potion=True):
         """Ressuscite a la position actuelle du fantome si possible."""
-        if self.state is not PlayerState.GHOST or not self.resurrection_potions.drink():
+        if self.state is not PlayerState.GHOST:
+            return None
+        if consume_potion and not self.resurrection_potions.drink():
             return None
         self.state = PlayerState.ALIVE
         self.time_remaining = 0.0
@@ -49,6 +52,8 @@ class GhostModeController:
         if self.state is PlayerState.GHOST:
             self.time_remaining = max(0.0, self.time_remaining - max(0.0, delta_time))
             if self.time_remaining == 0:
+                if self.auto_return_on_timeout:
+                    return self.return_to_alive(consume_potion=False)
                 return self.die()
         return None
 

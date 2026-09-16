@@ -1,7 +1,7 @@
 # Deadweight — Le Labyrinthe des Ames
 
-Jeu d'aventure/enigme 2D top-down jouable avec Pygame. Le joueur explore des
-labyrinthes, resout des enigmes, et bascule entre sa forme Vivante et sa forme
+Jeu d'aventure/enigme 2D top-down jouable avec Pygame. Le joueur explore un
+sanctuaire, resout des enigmes, et bascule entre sa forme Vivante et sa forme
 Fantome (fiole de poison pour mourir, fiole de resurrection pour revenir) afin
 de traverser certains murs specifiques ("murs dores"), en laissant derriere lui
 un cadavre.
@@ -14,32 +14,23 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Le jeu principal : Le Sanctuaire des Veilleurs
+## Le jeu principal : Le Sanctuaire, trois enigmes
 
 ```bash
 python main.py
 ```
 
-Sanctuaire radial (hub central + 8 salles thematiques : bibliotheque, cryptes,
-jardin, salle abandonnee, salle fantome...), plein ecran. Camera qui suit le
-joueur, carte complete avec brouillard de guerre (`M`), particules ambiantes
-(poussiere, fumee des torches), ames errantes visibles uniquement en fantome,
-symboles secrets invisibles pour un vivant.
+Lance le menu (Jouer / Tutoriel / Quitter). "Jouer" ouvre le sanctuaire en
+plein ecran avec trois enigmes independantes a resoudre pour ouvrir la porte
+de l'Autel : statues (Chapelle), chemin invisible (Jardin), leviers
+(Bibliotheque). `P` pour observer en fantome, `E` pour agir vivant, `M` pour
+la carte. [Commandes, regles et architecture](docs/enigmes.md).
 
-- ZQSD / fleches : se deplacer.
-- `P` : boire une fiole de poison (devenir fantome) ou de resurrection
-  (redevenir humain, a l'endroit ou l'on se trouve).
-- `M` : afficher/masquer la carte.
-- `R` : recommencer.
-
-Trois cles sont cachees dans la Bibliotheque, la Chapelle et le Jardin ; elles
-ouvrent la porte qui garde l'Autel (et la sortie), accessible uniquement en
-traversant le mur dore en mode Fantome.
-
-Code : `views/simple_map_view.py` (boucle de jeu), `views/map_theme.py` (decor
-et identite des salles), `views/effects.py` (ames errantes, animation de
-transformation), `systems/training_level.py` (regles, plan ASCII partage avec
-le couloir d'entrainement). Carte editable : `assets/maps/sanctuaire_radial.json`.
+Code : `views/menu_view.py` (menu), `views/puzzle_view.py` (boucle de jeu,
+etend `views/simple_map_view.py`), `systems/puzzle_level.py` /
+`systems/puzzle_manager.py` (regles des trois enigmes), `views/map_theme.py`
+(decor et identite des salles), `views/effects.py` (ames errantes, animation
+de transformation). Carte editable : `assets/maps/sanctuaire_enigmes.json`.
 
 ## Couloir d'entrainement
 
@@ -76,12 +67,15 @@ puis quitte, utile en CI) : `python main.py --smoke-test`.
 ## Arborescence
 
 ```
-main.py                        Point d'entree (lance le Sanctuaire)
+main.py                        Point d'entree (lance le menu)
 settings.py                    Constantes globales (fenetre, vitesses, timers, fioles...)
 requirements.txt
 
 views/
-├── simple_map_view.py           Boucle de jeu du Sanctuaire (camera, HUD, rendu)
+├── menu_view.py                  Menu principal (Jouer / Tutoriel / Quitter)
+├── puzzle_view.py                Boucle de jeu du Sanctuaire avec les 3 enigmes
+├── sanctuary_feedback.py         Effets de retour (secousses, sons, pulses de reussite)
+├── simple_map_view.py            Moteur du Sanctuaire (camera, HUD, rendu) : base de puzzle_view.py
 ├── map_theme.py                 Decor statique et identite des 9 salles du Sanctuaire
 ├── effects.py                   Ames errantes, animation de transformation, poussiere
 ├── pixel_effects.py             Utilitaires de rendu partages (sprites ASCII, halos)
@@ -89,27 +83,24 @@ views/
 ├── training_map_view.py         Couloir d'entrainement (mecanique isolee)
 ├── final_map_view.py            Rendu du niveau final de Kadir
 ├── game_view.py                  Prototype de labyrinthe independant (Thais)
-├── menu_view.py / hud.py / menus.py / victory_view.py / game_over_view.py
-│                                 Ecrans encore a construire (squelette d'equipe)
 
 entities/
 ├── ghost.py                     Animation Yurei (sprite fantome partage)
-├── player.py / corpse.py / traps.py
-│                                 A construire
+├── puzzle_object.py              Statues, leviers, cles, coffres, portes des enigmes
 
 systems/
+├── puzzle_level.py               Regles des 3 enigmes (statues, chemin, leviers)
+├── puzzle_manager.py             Generation et validation des 3 sequences a resoudre
 ├── training_level.py            Regles vivant/fantome (Sanctuaire + couloir d'entrainement)
 ├── final_level.py               Regles du niveau final de Kadir
 ├── ghost_mode.py                 Bascule Vivant <-> Fantome, fioles poison/resurrection
 ├── potion.py                     Inventaire de fioles
 ├── interactions.py               Regles d'interaction selon l'etat du joueur
 ├── level_manager.py              Chargement du plan ASCII du prototype de Thais
-├── doors_keys.py / levers.py / secrets.py / audio_manager.py
-│                                 A construire
 
 assets/
 ├── sprites/Yurei/                Sprite anime du fantome (Walk, Attack, Idle...)
-├── maps/                         Cartes Tiled/ASCII (sanctuaire_radial, training_corridor,
+├── maps/                         Cartes Tiled/ASCII (sanctuaire_enigmes, training_corridor,
 │                                  labyrinthe_des_ames_kadir)
 ├── sounds/
 └── fonts/
@@ -123,9 +114,8 @@ docs/                           Apercus et guides des niveaux
 
 | Module                                          | Responsable |
 |--------------------------------------------------|-------------|
-| `entities/player.py`, mouvement, collisions, PV   |  |
 | `entities/ghost.py`, `systems/ghost_mode.py`, `systems/potion.py` | Kadir |
-| `systems/level_manager.py`, `systems/doors_keys.py`, `views/game_view.py` | Thaïs |
-| `systems/levers.py`, `systems/secrets.py`         | Mélissa |
-| `entities/traps.py`                               | - |
-| `views/hud.py`, `views/menus.py`, `systems/audio_manager.py` |  |
+| `systems/level_manager.py`, `views/game_view.py`  | Thaïs |
+| `systems/puzzle_level.py`, `systems/puzzle_manager.py`, `entities/puzzle_object.py` | Mélissa |
+| `views/menu_view.py`                              |  |
+| `systems/audio_manager.py` (musique, sons)        |  |

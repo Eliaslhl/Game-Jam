@@ -39,7 +39,7 @@ PLAN = (
 
 class TestMapKadir:
     def __init__(self):
-        self.mode = GhostModeController()
+        self.mode = GhostModeController(auto_return_on_timeout=True)
         self.position = pygame.Vector2(100, 100)
         self.animation = YureiWalk()
         self.facing_left = False
