@@ -7,7 +7,26 @@ import pygame
 from systems.puzzle_level import PuzzleLevel
 from views.pixel_effects import DANGER_COLOR, lerp_color
 from views.sanctuary_feedback import SanctuaryFeedback
-from views.simple_map_view import SimpleMapGame, SIZE, VIEW, SIDEBAR, SIDEBAR_W, GOLD, INK, WHITE
+from views.simple_map_view import (
+    SimpleMapGame,
+    SIZE,
+    VIEW,
+    SIDEBAR,
+    SIDEBAR_W,
+    GOLD,
+    INK,
+    WHITE,
+    PANEL_BG,
+    RESURRECTION_COUNT,
+    STATUS_ALIVE_BG,
+    STATUS_GHOST_BG,
+    TEXT_DIM,
+    DIVIDER,
+    GHOST_STATUS,
+    GHOST_BAR_BG,
+    GHOST_BAR_FILL,
+    POTION_COUNT,
+)
 
 COLORS = {'blue':(105,193,255),'red':(245,120,119),'green':(133,226,162)}
 
@@ -17,24 +36,10 @@ class PuzzleGame(SimpleMapGame):
         super().__init__(PuzzleLevel())
         self.special_tiles = [t for t in self.special_tiles if t[2] != 'D']
         self.feedback_fx = SanctuaryFeedback()
-        self.text_commands=[]
-        self.display_fonts={}
-
-    def label(self,screen,text,position,color=WHITE,font=None):
-        self.text_commands.append((str(text),position,color,font or self.font,screen.get_clip().copy()))
-
-    def present(self,canvas,window):
-        size=(window.get_width(),window.get_height())
-        origin=(0,0)
-        window.blit(pygame.transform.scale(canvas,size),origin)
-        sx,sy=size[0]/SIZE[0],size[1]/SIZE[1]
-        for text,pos,color,font,clip in self.text_commands:
-            key=(font,sy)
-            if key not in self.display_fonts:
-                self.display_fonts[key]=pygame.font.Font(None,max(12,round((14 if font==self.small else 18)*sy)))
-            window.set_clip(pygame.Rect(origin[0]+round(clip.x*sx),origin[1]+round(clip.y*sy),round(clip.w*sx),round(clip.h*sy)))
-            window.blit(self.display_fonts[key].render(text,True,color),(origin[0]+round(pos[0]*sx),origin[1]+round(pos[1]*sy)))
-        window.set_clip(None)
+        # Le texte passe par la file `_text_commands` et le present() de
+        # SimpleMapGame (voir views/simple_map_view.py) : meme police que le
+        # menu (MedievalSharp) et meme rendu net, plutot qu'une police par
+        # defaut et un rendu separe rien que pour ce mode.
 
     def drain_events(self):
         while self.level.events:
@@ -71,7 +76,7 @@ class PuzzleGame(SimpleMapGame):
             screen.blit(aura,(0,0))
 
     def draw(self,screen):
-        self.text_commands.clear()
+        self._text_commands.clear()
         super().draw(screen)
         if not self.map_open and not self.level.won:
             success=next((p for p in reversed(self.feedback_fx.pulses) if p.kind=='solved' and .3<p.age<1.9),None)
@@ -186,8 +191,60 @@ class PuzzleGame(SimpleMapGame):
 
     def draw_top_bar(self,screen):
         pygame.draw.rect(screen,INK,(0,0,VIEW.w,VIEW.y))
-        self.label(screen,'LE SANCTUAIRE - TROIS ENIGMES',(8,2),GOLD)
-        self.label(screen,'Observer en fantome, agir en vivant',(8,19),WHITE,self.small)
+        pygame.draw.line(screen,DIVIDER,(0,VIEW.y-1),(VIEW.w,VIEW.y-1))
+        self.label(screen,'LE SANCTUAIRE - TROIS ENIGMES',(8,3),GOLD,self.font)
+        self.label(screen,'Observer en fantome, agir en vivant',(8,19),(139,156,163),self.small)
+
+    def _puzzle_sidebar_layout(self):
+        """Meme esprit que SimpleMapGame._sidebar_layout() (positions partagees,
+        badges/icones/pips) mais avec le contenu propre au mode enigmes :
+        recharge du poison, cles sur 3, indice courant, controles."""
+        level = self.level
+        x = SIDEBAR.x + 10
+        w = SIDEBAR_W - 20
+        y = 12
+        pos = {"x": x, "w": w, "title_y": y}
+        y += 14
+        pos["div1_y"] = y
+        y += 8
+        badge_h = 16
+        pos["badge"] = (x, y, w, badge_h)
+        y += badge_h + 8
+        pos["poison_y"] = y
+        y += 13
+        pos["resurrection_y"] = y
+        y += 13
+        y += 4
+        pos["cooldown_y"] = y
+        y += 12
+        if level.ghost:
+            pos["ghost_timer_y"] = y
+            y += 12
+            pos["ghost_bar"] = (x, y, w, 5)
+            y += 13
+        else:
+            pos["ghost_timer_y"] = None
+            pos["ghost_bar"] = None
+        y += 4
+        pos["div2_y"] = y
+        y += 8
+        pos["keys_label_y"] = y
+        y += 12
+        pos["keys_y"] = y
+        y += 24
+        y += 4
+        pos["div3_y"] = y
+        y += 8
+        pos["message_y"] = y
+        pos["message_lines"] = 4
+        y += pos["message_lines"] * 12
+        y += 4
+        pos["div4_y"] = y
+        y += 8
+        pos["controls_label_y"] = y
+        y += 12
+        pos["controls_y"] = y
+        return pos
 
     def draw_sidebar(self,screen):
         pygame.draw.rect(screen,INK,SIDEBAR)
@@ -212,14 +269,68 @@ class PuzzleGame(SimpleMapGame):
             self.label(screen,f'{level.mode.time_remaining:.1f} s',(x,251),bar_color if self.danger_intensity else (170,231,221),self.small)
             if self.danger_intensity:
                 self.label(screen,'REVENEZ VITE !',(x,263),bar_color,self.small)
+        level = self.level
+        pos = self._puzzle_sidebar_layout()
+        x, w = pos["x"], pos["w"]
+        pygame.draw.rect(screen, PANEL_BG, SIDEBAR)
+        pygame.draw.line(screen, GOLD, (SIDEBAR.x, 0), (SIDEBAR.x, SIDEBAR.h), 1)
+        self.label(screen, "ENIGMES", (x, pos["title_y"]), GOLD, self.small)
+        pygame.draw.line(screen, DIVIDER, (x, pos["div1_y"]), (x + w, pos["div1_y"]))
+
+        status = "FANTOME" if level.ghost else "VIVANT"
+        badge_bg = STATUS_GHOST_BG if level.ghost else STATUS_ALIVE_BG
+        badge_fg = GHOST_STATUS if level.ghost else WHITE
+        bx, by, bw, bh = pos["badge"]
+        pygame.draw.rect(screen, badge_bg, pos["badge"], border_radius=4)
+        pygame.draw.rect(screen, badge_fg, pos["badge"], width=1, border_radius=4)
+        tw, th = self.small.size(status)
+        self.label(screen, status, (bx + (bw - tw) / 2, by + (bh - th) / 2), badge_fg, self.small)
+
+        self._draw_potion_row(screen, x, w, pos["poison_y"], POTION_COUNT, "Poison", level.mode.poison_potions.count)
+        self._draw_potion_row(
+            screen, x, w, pos["resurrection_y"], RESURRECTION_COUNT, "Resurrection", level.mode.resurrection_potions.count
+        )
+
+        cooldown_text = f"Recharge {level.cooldown:.1f}s" if level.cooldown else "Poison pret"
+        cooldown_color = TEXT_DIM if level.cooldown else (150, 210, 160)
+        self.label(screen, cooldown_text, (x, pos["cooldown_y"]), cooldown_color, self.tiny)
+
+        if pos["ghost_bar"] is not None:
+            bar = pygame.Rect(*pos["ghost_bar"])
+            pygame.draw.rect(screen, GHOST_BAR_BG, bar, border_radius=2)
+            fill_w = max(0, int(bar.w * level.mode.time_remaining / level.mode.duration))
+            if fill_w > 0:
+                pygame.draw.rect(screen, GHOST_BAR_FILL, (bar.x, bar.y, fill_w, bar.h), border_radius=2)
+            self.label(screen, f"Retour dans {level.mode.time_remaining:.1f}s", (x, pos["ghost_timer_y"]), GHOST_STATUS, self.tiny)
+
+        pygame.draw.line(screen, DIVIDER, (x, pos["div2_y"]), (x + w, pos["div2_y"]))
+        self.label(screen, "CLES", (x, pos["keys_label_y"]), TEXT_DIM, self.tiny)
+        self._draw_key_pips(screen, x, pos["keys_y"], len(level.keys), 3)
+
+        pygame.draw.line(screen, DIVIDER, (x, pos["div3_y"]), (x + w, pos["div3_y"]))
+        message = level.message if level.message_time > 0 else "Chapelle : statues. Jardin : chemin. Bibliotheque : leviers."
+        for i, line in enumerate(textwrap.wrap(message, 22)[: pos["message_lines"]]):
+            self.label(screen, line, (x, pos["message_y"] + i * 12), WHITE, self.tiny)
+
+        pygame.draw.line(screen, DIVIDER, (x, pos["div4_y"]), (x + w, pos["div4_y"]))
+        self.label(screen, "CONTROLES", (x, pos["controls_label_y"]), TEXT_DIM, self.tiny)
+        for i, line in enumerate([
+            "P : fantome / retour",
+            "Entree : retour",
+            "E : interagir",
+            "M : carte / pause",
+            "R : recommencer",
+            "F11 : ecran",
+        ]):
+            self.label(screen, line, (x, pos["controls_y"] + i * 12), (180, 192, 200), self.tiny)
 
     def draw_map(self,screen):
         # L'atlas montre la geometrie mais jamais les solutions des enigmes.
-        self.text_commands.clear()
+        self._text_commands.clear()
         super().draw_map(screen)
 
     def draw_win(self,screen):
-        self.text_commands.clear()
+        self._text_commands.clear()
         super().draw_win(screen)
 
 
