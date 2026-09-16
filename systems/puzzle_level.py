@@ -6,6 +6,7 @@ from pathlib import Path
 import pygame
 from systems.training_level import TrainingLevel
 from systems.puzzle_manager import PuzzleManager
+from systems.hazards import GhostHazards
 from entities.puzzle_object import PuzzleObject
 
 MAP_PATH = Path(__file__).resolve().parents[1] / 'assets/maps/sanctuaire_enigmes.json'
@@ -16,6 +17,10 @@ class PuzzleLevel(TrainingLevel):
     def __init__(self, path=MAP_PATH, seed=None):
         super().__init__(path)
         self.generate_path(seed)
+        # Le chemin invisible n'existe qu'a partir d'ici (ajoute a self.data['objects']
+        # par generate_path) : on relance les trous pour qu'aucun ne tombe dessus, sinon
+        # l'enigme du chemin deviendrait injouable (un pas obligatoire serait mortel).
+        self.holes = GhostHazards(self._floor_cells(), count=len(self.holes))
         self.puzzles = PuzzleManager(self.data['puzzles'], seed=seed)
         self.objects = [PuzzleObject.from_data(d) for d in self.data['objects']]
         # Les indices et la validation partagent exactement la meme permutation.
@@ -46,6 +51,14 @@ class PuzzleLevel(TrainingLevel):
         self.mode.poison_potions.count = 3
         self.mode.resurrection_potions.count = 3
         self.say('Trois salles, trois cles. P : observer en fantome. E : interagir vivant.')
+
+    def _floor_cells(self):
+        """Comme TrainingLevel, mais sans les cases occupees par les objets des
+        enigmes (statues, leviers, indices, cles, portes, coffres) : les trous
+        spectraux restent dangereux ailleurs sur la carte, mais n'apparaissent
+        jamais sur un element d'enigme qu'ils recouvriraient inutilement."""
+        object_cells = {tuple(o['cell']) for o in self.data['objects']}
+        return [cell for cell in super()._floor_cells() if cell not in object_cells]
 
     def generate_path(self, seed):
         """Chemin orthogonal sans boucle, de l'entree a la cle du jardin."""
