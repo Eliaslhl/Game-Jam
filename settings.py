@@ -5,8 +5,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 FONTS_DIR = PROJECT_ROOT / "assets" / "fonts"
 SOUNDS_DIR = PROJECT_ROOT / "assets" / "sounds"
+IMAGES_DIR = PROJECT_ROOT / "assets" / "images"
 BACKGROUND_MUSIC = SOUNDS_DIR / "music_fond.wav"
 BACKGROUND_MUSIC_VOLUME = 0.35
+
+# Logo rond du jeu, affiche a la place du titre dans le menu principal.
+LOGO_FILE = IMAGES_DIR / "logo.jpeg"
 
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
