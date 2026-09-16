@@ -206,6 +206,11 @@ def build_room_decor(decor_surface, tiles, level):
     wash_room(decor_surface, ROOM_RECTS["SW"], level, (90, 70, 40), 45)
     scatter_art_in_room(decor_surface, tiles.art, "plant", level, ROOM_RECTS["SW"], 0.15, 33)
 
+    wash_room(decor_surface, ROOM_RECTS["SE"], level, (45, 80, 45), 45)
+    scatter_art_in_room(decor_surface, tiles.art, "plant", level, ROOM_RECTS["SE"], 0.16, 44)
+    draw_bush(decor_surface, ROOM_RECTS["SE"].x + 18, ROOM_RECTS["SE"].y + 18)
+    draw_bush(decor_surface, ROOM_RECTS["SE"].right - 18, ROOM_RECTS["SE"].bottom - 18)
+
 
 def build_ghost_secrets(map_size):
     """Symboles spectraux, invisibles pour un vivant : le monde n'est pas le meme

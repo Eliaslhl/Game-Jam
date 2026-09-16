@@ -100,8 +100,9 @@ class SimpleMapGame:
             for y in range(self.level.height)
             for x in range(self.level.width)
             for tile in [self.level.tile(x, y)]
-            if tile in "YE"
+            if tile in "YEKD"
         ]
+        self.key_glow = make_glow(14, (235, 196, 90), 130)
 
         self.title_surface = self.font.render("LE SANCTUAIRE DES VEILLEURS", True, GOLD)
         self.zone_labels = {
@@ -230,6 +231,24 @@ class SimpleMapGame:
             elif tile == "E":
                 pygame.draw.rect(screen, (29, 55, 49), (px - 10, py - 14, 20, 25))
                 pygame.draw.rect(screen, (119, 232, 155), (px - 10, py - 14, 20, 25), 2, border_radius=8)
+            elif tile == "K":
+                if (x, y) in level.collected_key_positions:
+                    continue
+                bob = round(math.sin(self.elapsed * 3 + x * 1.7 + y * 2.3) * 2)
+                screen.blit(self.key_glow, (px - 14, py - 14 + bob), special_flags=pygame.BLEND_RGBA_ADD)
+                frame = self.tiles.art["key"]
+                screen.blit(frame, (px - frame.get_width() // 2, py - frame.get_height() // 2 + bob))
+            elif tile == "D":
+                locked = level.keys_collected < level.keys_total
+                rect = pygame.Rect(px - 8, py - 8, 16, 16)
+                if locked:
+                    pygame.draw.rect(screen, (74, 48, 34), rect.inflate(-1, -1))
+                    pygame.draw.rect(screen, (40, 26, 18), rect.inflate(-1, -1), 2)
+                    pygame.draw.line(screen, (40, 26, 18), (rect.centerx, rect.y + 2), (rect.centerx, rect.bottom - 2), 2)
+                    pygame.draw.circle(screen, (214, 178, 90), (rect.centerx, rect.centery), 2)
+                else:
+                    pygame.draw.rect(screen, (30, 46, 36), rect.inflate(-4, -1))
+                    pygame.draw.rect(screen, (140, 196, 150), rect.inflate(-4, -1), 1)
 
     def draw_player(self, screen, level, px, py):
         pygame.draw.ellipse(screen, (12, 19, 27), (px - 6, py + 2, 12, 5))
@@ -349,7 +368,7 @@ class SimpleMapGame:
         y += 8
         self.label(screen, "Objets :", (x, y), GOLD, self.small)
         y += 14
-        self.label(screen, "-", (x, y), (139, 156, 163), self.small)
+        self.label(screen, f"Cles : {level.keys_collected}/{level.keys_total}", (x, y), (235, 196, 90), self.small)
 
     def draw_map(self, screen):
         box = pygame.Rect(15, 15, SIZE[0] - 30, SIZE[1] - 30)

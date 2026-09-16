@@ -26,6 +26,9 @@ class TrainingLevel:
         self.spawn = self.data["spawn"]
         self.position = self.center(self.spawn)
         self.mode = GhostModeController(self.data["ghost_duration"])
+        self.keys_total = sum(row.count("K") for row in self.grid)
+        self.keys_collected = 0
+        self.collected_key_positions = set()
         self.won = False
         self.message = "P : devenez fantome pour traverser. P a nouveau pour redevenir humain."
         self.message_time = 6.0
@@ -55,6 +58,8 @@ class TrainingLevel:
             return False
         if tile == "Y":
             return ghost
+        if tile == "D":
+            return self.keys_collected >= self.keys_total
         return True
 
     def blocked(self, position):
@@ -107,6 +112,12 @@ class TrainingLevel:
                 setattr(candidate, axis, getattr(candidate, axis) + getattr(step, axis))
                 if not self.blocked(candidate):
                     self.position.update(candidate)
+
+        cell = self.cell
+        if self.tile(*cell) == "K" and cell not in self.collected_key_positions:
+            self.collected_key_positions.add(cell)
+            self.keys_collected += 1
+            self.say(f"Cle trouvee ({self.keys_collected}/{self.keys_total}).")
 
         if not self.ghost and self.tile(*self.cell) == "E":
             self.won = True
