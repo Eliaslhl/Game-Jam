@@ -92,7 +92,9 @@ class PuzzleLevel(TrainingLevel):
         self.say(message)
 
     def return_to_body(self):
-        restored = self.mode.return_to_alive()
+        # Position actuelle (fantome), pas celle du corps laisse en buvant le
+        # poison : on ressuscite la ou on se trouve, pas la ou on est mort.
+        restored = self.mode.return_to_alive(self.position)
         if restored is None:
             self.notify('wrong','Plus de potions de resurrection. Attendez la fin du temps fantome.')
             return

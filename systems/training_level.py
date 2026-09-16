@@ -41,14 +41,27 @@ class TrainingLevel:
         self.message = "P : poison / R : resurrection / N : recommencer"
         self.message_time = 6.0
 
+    def _is_pinch_point(self, x, y):
+        """Case situee dans un passage large d'une seule tuile (couloir etroit,
+        pas de case parallele pour contourner) : un piege ici bloquerait
+        totalement le passage plutot que d'etre simplement evitable."""
+        def wall(cx, cy):
+            return self.tile(cx, cy) == "#"
+        pinched_horizontally = wall(x - 1, y) and wall(x + 1, y)
+        pinched_vertically = wall(x, y - 1) and wall(x, y + 1)
+        return pinched_horizontally or pinched_vertically
+
     def _floor_cells(self):
-        """Cases de sol nu ('.') eligibles pour un trou, hors case de spawn."""
+        """Cases de sol nu ('.') eligibles pour un trou, hors case de spawn et
+        hors couloirs larges d'une seule case (voir _is_pinch_point)."""
         spawn_cell = tuple(self.spawn)
         return [
             (x, y)
             for y in range(self.height)
             for x in range(self.width)
-            if self.tile(x, y) == "." and (x, y) != spawn_cell
+            if self.tile(x, y) == "."
+            and (x, y) != spawn_cell
+            and not self._is_pinch_point(x, y)
         ]
 
     @property
