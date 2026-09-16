@@ -10,11 +10,6 @@ from entities.puzzle_object import PuzzleObject
 
 MAP_PATH = Path(__file__).resolve().parents[1] / 'assets/maps/sanctuaire_enigmes.json'
 
-# Distance (en pixels) a laquelle un panneau se lit tout seul. Une case fait
-# 16 px : c'est donc un peu plus large que la portee d'interaction (23), pour
-# que l'inscription s'affiche en passant devant, sans avoir a se coller dessus.
-SIGN_READING_RANGE = 26
-
 
 class PuzzleLevel(TrainingLevel):
     _previous_path = None
@@ -52,6 +47,9 @@ class PuzzleLevel(TrainingLevel):
         self.feedback = ''
         self.feedback_time = 0.0
         self.previous_path_cell = None
+        # Texte du panneau sur lequel on se tient, pour pouvoir l'effacer des
+        # qu'on en descend (voir read_sign_underfoot).
+        self._sign_underfoot = None
         self.mode.poison_potions.count = 3
         self.mode.resurrection_potions.count = 3
         self.say('Trois salles, trois cles. P : observer en fantome. E : interagir vivant.')
@@ -198,25 +196,36 @@ class PuzzleLevel(TrainingLevel):
         self.previous_path_cell = None
         self.notify('wrong','Mauvaise dalle : retour a l entree de la salle. Vos cles sont conservees.')
 
-    def read_nearby_sign(self):
-        """Les panneaux (les "?") se lisent tout seuls des qu'on s'en approche :
-        leur texte part sur le parchemin sans avoir a appuyer sur E.
+    def read_sign_underfoot(self):
+        """Les panneaux (les "?") se lisent quand on marche dessus : leur texte
+        part sur le parchemin sans avoir a appuyer sur E. Il faut etre sur la
+        case du panneau, pas seulement a cote : passer devant sans s'arreter ne
+        declenche rien.
 
-        Il y reste tant qu'on est devant, mais ne recouvre jamais un message qui
-        vient d'arriver (cle ramassee, coffre ouvert, mauvaise sequence) : ce
-        message-la passe d'abord, et l'inscription revient quand il s'efface.
-        Un panneau peut en revanche remplacer un autre panneau tout de suite."""
-        signs = [
-            obj for obj in self.objects
-            if obj.type == 'sign' and obj.visible_to(self)
-            and self.center(obj.cell).distance_to(self.position) <= SIGN_READING_RANGE
-        ]
-        if not signs:
+        Le texte reste affiche tant qu'on ne quitte pas la case, mais ne
+        recouvre jamais un message qui vient d'arriver (cle ramassee, coffre
+        ouvert, mauvaise sequence) : ce message-la passe d'abord, et
+        l'inscription revient quand il s'efface. Un panneau peut en revanche
+        remplacer un autre panneau tout de suite."""
+        sign = next(
+            (obj for obj in self.objects
+             if obj.type == 'sign' and obj.cell == self.cell and obj.visible_to(self)),
+            None,
+        )
+        if sign is None:
+            # On vient de quitter la case : l'inscription s'efface immediatement,
+            # au lieu de trainer le temps que son compte a rebours expire. On ne
+            # coupe que l'inscription elle-meme : un message de jeu affiche
+            # entre-temps garde ses secondes.
+            if self._sign_underfoot is not None and self.message == self._sign_underfoot:
+                self.message_time = 0
+            self._sign_underfoot = None
             return False
-        nearest = min(signs, key=lambda obj: self.center(obj.cell).distance_to(self.position))
+
+        self._sign_underfoot = sign.text
         sign_texts = {obj.text for obj in self.objects if obj.type == 'sign'}
         if self.message_time <= 0 or self.message in sign_texts:
-            self.say(nearest.text)
+            self.say(sign.text)
         return True
 
     def process_cell(self):
@@ -229,10 +238,11 @@ class PuzzleLevel(TrainingLevel):
             if nearby:
                 nearest=min(nearby,key=lambda o:self.center(o.cell).distance_to(self.position))
                 self.say(nearest.text)
-            else:
-                # Les indices spectraux passent avant : un panneau ne se lit que
-                # si aucune inscription fantome n'occupe deja le parchemin.
-                self.read_nearby_sign()
+            # Appele meme quand un indice vient de parler : son garde interne
+            # l'empeche de recouvrir l'indice (les spectres passent avant), mais
+            # l'appel tient a jour la case sous les pieds, sans quoi l'effacement
+            # en sortie de panneau ne se declencherait pas.
+            self.read_sign_underfoot()
             return
         path = self.puzzles.puzzles['path_green']
         danger = pygame.Rect(self.data['danger_room']['rect'])
@@ -250,7 +260,7 @@ class PuzzleLevel(TrainingLevel):
             self.previous_path_cell = None
         for obj in self.objects:
             if obj.type == 'key' and obj.cell == self.cell: obj.interact(self)
-        self.read_nearby_sign()
+        self.read_sign_underfoot()
         if self.tile(*self.cell) == 'E' and {'blue','red','green'} <= self.keys:
             self.won = True
             self.notify('solved','Trois mondes compris. Le sanctuaire vous laisse partir !')
