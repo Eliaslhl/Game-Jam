@@ -13,7 +13,14 @@ import pygame
 from entities.ghost import YureiWalk
 from systems.training_level import TrainingLevel
 from views.pixel_art import PixelTiles
-from views.pixel_effects import make_glow
+from views.pixel_effects import (
+    DANGER_COLOR,
+    danger_shake,
+    draw_danger_vignette,
+    ghost_danger_intensity,
+    lerp_color,
+    make_glow,
+)
 from views.map_theme import (
     ROOM_RECTS,
     ROOM_THEMES,
@@ -94,6 +101,7 @@ class SimpleMapGame:
         self.facing_left = False
         self.moving = False
         self.map_open = False
+        self.danger_intensity = 0.0
         self.shade = pygame.Surface(VIEW.size, pygame.SRCALPHA)
         self.lights = {}
 
@@ -135,6 +143,16 @@ class SimpleMapGame:
             self.facing_left = direction[0] < 0
         self.elapsed += dt
         self.update_camera()
+
+        mode = self.level.mode
+        self.danger_intensity = (
+            ghost_danger_intensity(mode.time_remaining, mode.duration) if self.level.ghost else 0.0
+        )
+        if self.danger_intensity:
+            dx, dy = danger_shake(self.elapsed, self.danger_intensity)
+            self.camera.x += dx
+            self.camera.y += dy
+
         for soul in self.souls:
             soul.update(dt)
 
@@ -204,6 +222,8 @@ class SimpleMapGame:
         for wx, _, (px2, py2) in torch_points:
             self.draw_smoke(screen, wx, px2, py2)
         self.draw_dust(screen)
+        if self.danger_intensity:
+            draw_danger_vignette(screen, VIEW, self.elapsed, self.danger_intensity)
 
         screen.set_clip(None)
         self.draw_top_bar(screen)
@@ -365,7 +385,8 @@ class SimpleMapGame:
         y += 18
 
         status = "AME ERRANTE" if level.ghost else "VIVANT"
-        self.label(screen, status, (x, y), (154, 222, 211) if level.ghost else WHITE, self.small)
+        status_color = lerp_color((154, 222, 211), DANGER_COLOR, self.danger_intensity) if level.ghost else WHITE
+        self.label(screen, status, (x, y), status_color, self.small)
         y += 16
         self.label(screen, f"Poison : {level.mode.poison_potions.count}", (x, y), (192, 150, 228), self.small)
         y += 14
@@ -373,9 +394,13 @@ class SimpleMapGame:
         y += 16
 
         if level.ghost:
+            bar_color = lerp_color((172, 136, 223), DANGER_COLOR, self.danger_intensity)
             pygame.draw.rect(screen, (43, 48, 63), (x, y, SIDEBAR_W - 16, 4))
-            pygame.draw.rect(screen, (172, 136, 223), (x, y, int((SIDEBAR_W - 16) * level.mode.time_remaining / level.mode.duration), 4))
+            pygame.draw.rect(screen, bar_color, (x, y, int((SIDEBAR_W - 16) * level.mode.time_remaining / level.mode.duration), 4))
             y += 12
+            if self.danger_intensity:
+                self.label(screen, "REVENEZ VITE !", (x, y), bar_color, self.small)
+                y += 12
 
         y += 8
         self.label(screen, "Objets :", (x, y), GOLD, self.small)

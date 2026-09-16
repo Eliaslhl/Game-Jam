@@ -5,6 +5,7 @@ import sys
 import textwrap
 import pygame
 from systems.puzzle_level import PuzzleLevel
+from views.pixel_effects import DANGER_COLOR, lerp_color
 from views.sanctuary_feedback import SanctuaryFeedback
 from views.simple_map_view import SimpleMapGame, SIZE, VIEW, SIDEBAR, SIDEBAR_W, GOLD, INK, WHITE
 
@@ -192,7 +193,8 @@ class PuzzleGame(SimpleMapGame):
         pygame.draw.rect(screen,INK,SIDEBAR)
         x=SIDEBAR.x+8
         level=self.level
-        lines=[('ENIGMES',GOLD),('FANTOME' if level.ghost else 'VIVANT',WHITE),
+        status_color=lerp_color((170,231,221),DANGER_COLOR,self.danger_intensity) if level.ghost else WHITE
+        lines=[('ENIGMES',GOLD),('FANTOME' if level.ghost else 'VIVANT',status_color),
                (f'Poison : {level.mode.poison_potions.count}',(195,151,231)),
                (f'Resurrection : {level.mode.resurrection_potions.count}',(150,200,228)),
                (f'Recharge : {level.cooldown:.1f}s' if level.cooldown else 'Poison pret',WHITE),
@@ -203,7 +205,13 @@ class PuzzleGame(SimpleMapGame):
             self.label(screen,line,(x,172+i*12),WHITE,self.small)
         for i,line in enumerate(['P : fantome / retour','Entree : retour','E : interagir','M : carte / pause','R : tout recommencer','F11 : fenetre / ecran']):
             self.label(screen,line,(x,274+i*14),(180,192,200),self.small)
-        if level.ghost:self.label(screen,f'{level.mode.time_remaining:.1f} s',(x,251),(170,231,221),self.small)
+        if level.ghost:
+            bar_color=lerp_color((172,136,223),DANGER_COLOR,self.danger_intensity)
+            pygame.draw.rect(screen,(43,48,63),(x,238,SIDEBAR_W-16,4))
+            pygame.draw.rect(screen,bar_color,(x,238,int((SIDEBAR_W-16)*level.mode.time_remaining/level.mode.duration),4))
+            self.label(screen,f'{level.mode.time_remaining:.1f} s',(x,251),bar_color if self.danger_intensity else (170,231,221),self.small)
+            if self.danger_intensity:
+                self.label(screen,'REVENEZ VITE !',(x,263),bar_color,self.small)
 
     def draw_map(self,screen):
         # L'atlas montre la geometrie mais jamais les solutions des enigmes.

@@ -9,7 +9,14 @@ import pygame
 from entities.ghost import YureiWalk
 from systems.training_level import TrainingLevel
 from views.pixel_art import PixelTiles
-from views.pixel_effects import make_glow
+from views.pixel_effects import (
+    DANGER_COLOR,
+    danger_shake,
+    draw_danger_vignette,
+    ghost_danger_intensity,
+    lerp_color,
+    make_glow,
+)
 
 SIZE = (320, 150)
 VIEW = pygame.Rect(0, 24, 320, 48)
@@ -38,6 +45,8 @@ class TrainingGame:
         self.elapsed = 0.0
         self.facing_left = False
         self.moving = False
+        self.danger_intensity = 0.0
+        self.shake_offset = (0.0, 0.0)
         self.shade = pygame.Surface(VIEW.size, pygame.SRCALPHA)
         self.lights = {}
 
@@ -78,6 +87,12 @@ class TrainingGame:
             self.facing_left = direction[0] < 0
         self.elapsed += dt
 
+        mode = self.level.mode
+        self.danger_intensity = (
+            ghost_danger_intensity(mode.time_remaining, mode.duration) if self.level.ghost else 0.0
+        )
+        self.shake_offset = danger_shake(self.elapsed, self.danger_intensity)
+
     def event(self, key):
         if key == pygame.K_n and (self.level.won or self.level.lost):
             self.__init__()
@@ -85,7 +100,7 @@ class TrainingGame:
             self.level.action(key)
 
     def point(self, world):
-        return round(world[0]), round(world[1] + VIEW.y)
+        return round(world[0] + self.shake_offset[0]), round(world[1] + VIEW.y + self.shake_offset[1])
 
     def glow(self, radius, strength):
         key = (radius, strength)
@@ -151,6 +166,9 @@ class TrainingGame:
             pygame.draw.polygon(screen, (205, 112, 47), [(px2 - 3, py2), (px2, py2 - flame - 3), (px2 + 3, py2)])
             pygame.draw.line(screen, (255, 223, 131), (px2, py2), (px2, py2 - flame))
 
+        if self.danger_intensity:
+            draw_danger_vignette(screen, VIEW, self.elapsed, self.danger_intensity)
+
         screen.set_clip(None)
         self.draw_hud(screen)
         if level.won:
@@ -167,12 +185,14 @@ class TrainingGame:
         pygame.draw.rect(screen, INK, (0, 72, SIZE[0], SIZE[1] - 72))
         pygame.draw.line(screen, (61, 65, 64), (8, 73), (SIZE[0] - 8, 73))
         status = "AME ERRANTE" if level.ghost else "VIVANT"
-        self.label(screen, status, (8, 79), (154, 222, 211) if level.ghost else WHITE, self.small)
+        status_color = lerp_color((154, 222, 211), DANGER_COLOR, self.danger_intensity) if level.ghost else WHITE
+        self.label(screen, status, (8, 79), status_color, self.small)
         self.label(screen, f"POISON {level.mode.poison_potions.count}", (SIZE[0] - 118, 79), (192, 150, 228), self.small)
         self.label(screen, f"RESUR. {level.mode.resurrection_potions.count}", (SIZE[0] - 118, 93), (150, 200, 228), self.small)
         if level.ghost:
+            bar_color = lerp_color((172, 136, 223), DANGER_COLOR, self.danger_intensity)
             pygame.draw.rect(screen, (43, 48, 63), (70, 80, 80, 4))
-            pygame.draw.rect(screen, (172, 136, 223), (70, 80, int(80 * level.mode.time_remaining / level.mode.duration), 4))
+            pygame.draw.rect(screen, bar_color, (70, 80, int(80 * level.mode.time_remaining / level.mode.duration), 4))
         message = level.message if level.message_time > 0 else "P : poison / R : resurrection / N : recommencer"
         for i, line in enumerate(textwrap.wrap(message, 60)):
             self.label(screen, line, (8, 92 + i * 11), WHITE, self.small)
