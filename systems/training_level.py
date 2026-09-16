@@ -19,7 +19,7 @@ HOLE_COUNT = 4
 
 
 class TrainingLevel:
-    def __init__(self, path=MAP_PATH):
+    def __init__(self, path=MAP_PATH, hole_count=None):
         self.data = json.loads(Path(path).read_text(encoding="utf-8"))
         self.grid = self.data["grid"]
         self.width, self.height = len(self.grid[0]), len(self.grid)
@@ -33,7 +33,9 @@ class TrainingLevel:
         self.keys_collected = 0
         self.collected_key_positions = set()
         self.won = False
-        self.holes = GhostHazards(self._floor_cells(), count=HOLE_COUNT)
+        # hole_count=0 desactive les pieges (ex : le couloir d'entrainement, ou
+        # on ne veut pas surprendre le joueur avant la vraie partie).
+        self.holes = GhostHazards(self._floor_cells(), count=HOLE_COUNT if hole_count is None else hole_count)
         self.message = "P : devenez fantome pour traverser. P a nouveau pour redevenir humain."
         self.lost = False
         self.message = "P : poison / R : resurrection / N : recommencer"
@@ -132,7 +134,8 @@ class TrainingLevel:
                     self.position.update(candidate)
 
         if self.holes.is_lethal(self.cell):
-            self.dead = True
+            self.mode.die()
+            self.lost = True
             self.say("Un trou spectral vous a englouti.")
             return
 

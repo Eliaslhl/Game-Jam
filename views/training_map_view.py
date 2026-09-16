@@ -23,7 +23,9 @@ GAME_OVER_RED = (196, 30, 30)
 
 class TrainingGame:
     def __init__(self):
-        self.level = TrainingLevel()
+        # Pas de pieges dans le tutoriel : on decouvre la mecanique fantome sans
+        # se faire surprendre, les vrais trous n'apparaissent qu'en partie.
+        self.level = TrainingLevel(hole_count=0)
         self.tiles = PixelTiles(self.level)
         self._add_bottom_wall_torches()
         # En mode fantome, le couloir devient presque blanc (le reste garde ses couleurs).
