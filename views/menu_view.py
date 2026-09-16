@@ -9,6 +9,8 @@ from settings import (
     SCREEN_TITLE,
     UI_FONT_FILE,
     TITLE_FONT_FILE,
+    BACKGROUND_MUSIC,
+    BACKGROUND_MUSIC_VOLUME,
     INK,
     PALE,
     GOLD,
@@ -153,9 +155,22 @@ def main() -> None:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     pygame.init()
-    screen = _new_window()
-    run(screen)
-    pygame.quit()
+    music_started = False
+    try:
+        try:
+            pygame.mixer.music.load(str(BACKGROUND_MUSIC))
+            pygame.mixer.music.set_volume(BACKGROUND_MUSIC_VOLUME)
+            pygame.mixer.music.play(-1)
+            music_started = True
+        except (pygame.error, OSError) as error:
+            print(f"Musique indisponible : {error}")
+
+        screen = _new_window()
+        run(screen)
+    finally:
+        if music_started:
+            pygame.mixer.music.stop()
+        pygame.quit()
 
 
 if __name__ == "__main__":

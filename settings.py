@@ -4,6 +4,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 FONTS_DIR = PROJECT_ROOT / "assets" / "fonts"
+SOUNDS_DIR = PROJECT_ROOT / "assets" / "sounds"
+BACKGROUND_MUSIC = SOUNDS_DIR / "music_fond.wav"
+BACKGROUND_MUSIC_VOLUME = 0.35
 
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720

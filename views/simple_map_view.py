@@ -6,7 +6,9 @@ petits utilitaires de rendu partages avec le couloir d'entrainement dans
 `pixel_effects.py`.
 """
 import math
+import os
 from pathlib import Path
+import sys
 
 import pygame
 
@@ -41,6 +43,7 @@ from views.effects import (
     generate_dust_motes,
     make_souls,
 )
+from settings import BACKGROUND_MUSIC, BACKGROUND_MUSIC_VOLUME
 
 MAPS_DIR = Path(__file__).resolve().parents[1] / "assets/maps"
 MAP_PATH = MAPS_DIR / "sanctuaire_radial.json"
@@ -439,3 +442,56 @@ class SimpleMapGame:
         screen.blit(veil, (0, 0))
         self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, SIZE[1] // 2 - 10), (232, 120, 120), self.font)
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
+
+
+def main():
+    if "--smoke-test" in sys.argv:
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+    pygame.init()
+    music_started = False
+    try:
+        try:
+            pygame.mixer.music.load(str(BACKGROUND_MUSIC))
+            pygame.mixer.music.set_volume(BACKGROUND_MUSIC_VOLUME)
+            pygame.mixer.music.play(-1)
+            music_started = True
+        except (pygame.error, OSError):
+            # Le jeu reste jouable si le système audio n'est pas disponible.
+            pass
+
+        window = pygame.display.set_mode((940, 724))
+        pygame.display.set_caption("Le sanctuaire - Deadweight")
+        canvas = pygame.Surface(SIZE)
+        game = SimpleMapGame()
+        clock = pygame.time.Clock()
+        running = True
+        while running:
+            dt = min(clock.tick(60) / 1000, 0.05)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                    else:
+                        game.event(event.key)
+
+            keys = pygame.key.get_pressed()
+            direction = (
+                int(keys[pygame.K_d] or keys[pygame.K_RIGHT])
+                - int(keys[pygame.K_q] or keys[pygame.K_a] or keys[pygame.K_LEFT]),
+                int(keys[pygame.K_s] or keys[pygame.K_DOWN])
+                - int(keys[pygame.K_z] or keys[pygame.K_w] or keys[pygame.K_UP]),
+            )
+            game.update(dt, direction)
+            game.draw(canvas)
+            window.blit(pygame.transform.scale(canvas, window.get_size()), (0, 0))
+            pygame.display.flip()
+            if "--smoke-test" in sys.argv:
+                running = False
+    finally:
+        if music_started:
+            pygame.mixer.music.stop()
+        pygame.quit()
