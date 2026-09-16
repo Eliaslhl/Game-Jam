@@ -1,7 +1,6 @@
 """Les trois enigmes du sanctuaire : observer mort, resoudre vivant."""
 import math
 import random
-from itertools import product
 from pathlib import Path
 import pygame
 from systems.training_level import TrainingLevel
@@ -13,32 +12,52 @@ MAP_PATH = Path(__file__).resolve().parents[1] / 'assets/maps/sanctuaire_enigmes
 
 
 class PuzzleLevel(TrainingLevel):
-    _previous_path = None
     def __init__(self, path=MAP_PATH, seed=None):
-        super().__init__(path)
-        self.generate_path(seed)
-        # Le chemin invisible n'existe qu'a partir d'ici (ajoute a self.data['objects']
-        # par generate_path) : on relance les trous pour qu'aucun ne tombe dessus, sinon
-        # l'enigme du chemin deviendrait injouable (un pas obligatoire serait mortel).
-        self.holes = GhostHazards(self._floor_cells(), count=len(self.holes))
-        self.puzzles = PuzzleManager(self.data['puzzles'], seed=seed)
-        self.objects = [PuzzleObject.from_data(d) for d in self.data['objects']]
-        # Les indices et la validation partagent exactement la meme permutation.
-        for obj in self.objects:
-            if obj.clue_target:
-                rank = self.puzzles.puzzles[obj.puzzle_id].solution.index(obj.clue_target)
-                member=obj.clue_target.rsplit('_',1)[-1]
-                sequence=self.puzzles.puzzles[obj.puzzle_id].solution
-                if rank==0:
-                    obj.text=f'La statue {member} veille avant toutes les autres.'
-                else:
-                    previous=sequence[rank-1].rsplit('_',1)[-1]
-                    obj.text=f'La statue {member} ne repond qu apres la statue {previous}.'
-            elif obj.clue_index is not None:
-                sequence=[m.rsplit('_',1)[-1] for m in self.puzzles.puzzles[obj.puzzle_id].solution]
-                obj.text=[f'{sequence[0]} doit preceder {sequence[1]}.',
-                          f'{sequence[2]} attend que {sequence[1]} ait parle.',
-                          f'Le veilleur {sequence[0]} ouvre le rituel.'][obj.clue_index]
+        super().__init__(path, hole_count=0)
+        self.mode.auto_return_on_timeout = True
+        rng = random.Random(seed)
+        self.rooms = {'tomb': pygame.Rect(10,34,6,6),
+                      'statue': pygame.Rect(35,34,5,5),
+                      'wall': pygame.Rect(39,22,5,6)}
+        self.order = rng.sample(list(self.rooms), 3)
+        colors = rng.sample(['blue', 'red', 'green'], 2)
+        self.entry_cells = {'tomb': (13,33), 'statue': (37,33), 'wall': (39,25)}
+        self.objects = []
+        definitions = []
+        self.targets = {'tomb': rng.randrange(5), 'statue': rng.choice([(36,35),(37,35),(38,35)]),
+                        'wall': rng.randrange(3)}
+        self.wall_hits = 0
+        self.statue_motion = None
+        self.last_room = None
+        # Fermer l'ancien acces spectral lateral et l'ancienne sortie du jardin.
+        for x,y in [(44,24),(39,39)]:
+            row=list(self.grid[y]); row[x]='#'; self.grid[y]=''.join(row)
+        for i,pid in enumerate(self.order):
+            reward = colors[i] if i < 2 else 'silver'
+            definitions.append(dict(id=pid,type='physical',solution=[],reward={'type':'key','id':reward}))
+            self.objects.append(PuzzleObject('entry_'+pid,'door',self.entry_cells[pid],
+                state='open' if i==0 else 'closed', required_keys=[] if i==0 else [colors[i-1]]))
+            cell={'tomb':(13,38),'statue':(37,37),'wall':(41,22)}[pid]
+            self.objects.extend([PuzzleObject(pid+'_chest','chest',cell,pid,state='hidden',loot={'poison':1,'resurrection':1}),
+                                 PuzzleObject(pid+'_key','key',cell,pid,key_id=reward)])
+        for i in range(5):
+            self.objects.append(PuzzleObject('tomb_'+str(i),'tomb',(10+i,35),'tomb'))
+        self.objects.append(PuzzleObject('moving_statue','statue',(37,37),'statue'))
+        for i,x in enumerate((36,37,38)):
+            self.objects.append(PuzzleObject('socket_'+str(i),'socket',(x,35),'statue',interaction_allowed=False))
+        for i,x in enumerate((40,41,42)):
+            self.objects.append(PuzzleObject('wall_'+str(i),'wall',(x,23),'wall'))
+        # Le coffre du mur est derriere une cloison complete, sans contournement.
+        row=list(self.grid[23]); row[39]=row[43]='#'; self.grid[23]=''.join(row)
+        self.objects.append(PuzzleObject('future_door','door',(25,9),required_keys=['silver'],text='future'))
+        self.puzzles = PuzzleManager(definitions, seed=seed)
+        self.puzzles.puzzles['tomb'].solution = ['tomb_'+str(self.targets['tomb'])]
+        self.puzzles.puzzles['statue'].solution = ['moving_statue']
+        self.puzzles.puzzles['wall'].solution = ['wall_'+str(self.targets['wall'])]
+        # Aucune mort aleatoire dans les salles ou leurs entrees.
+        self.holes = GhostHazards([c for c in self._floor_cells()
+            if any(r.collidepoint(c) for r in (pygame.Rect(11,11,4,4),
+                       pygame.Rect(35,11,4,4),pygame.Rect(6,23,5,4)))], count=4)
         self.time = 0.0
         self.key_ready_at = {}
         self.keys = set()
@@ -47,44 +66,21 @@ class PuzzleLevel(TrainingLevel):
         self.events = []
         self.feedback = ''
         self.feedback_time = 0.0
-        self.previous_path_cell = None
         self.mode.poison_potions.count = 3
         self.mode.resurrection_potions.count = 3
-        self.say('Trois salles, trois cles. P : observer en fantome. E : interagir vivant.')
+        self.say('Zones jaunes sur la carte (M). P : fantome. E : fouiller, pousser ou frapper.')
 
-    def _floor_cells(self):
-        """Comme TrainingLevel, mais sans les cases occupees par les objets des
-        enigmes (statues, leviers, indices, cles, portes, coffres) : les trous
-        spectraux restent dangereux ailleurs sur la carte, mais n'apparaissent
-        jamais sur un element d'enigme qu'ils recouvriraient inutilement."""
-        object_cells = {tuple(o['cell']) for o in self.data['objects']}
-        return [cell for cell in super()._floor_cells() if cell not in object_cells]
+    @property
+    def trial_room(self):
+        return next((pid for pid,rect in self.rooms.items() if rect.collidepoint(self.cell)), None)
 
-    def generate_path(self, seed):
-        """Chemin orthogonal sans boucle, de l'entree a la cle du jardin."""
-        rng=random.Random(seed) if seed is not None else random.SystemRandom()
-        candidates=[]
-        for targets in product(range(35,40),repeat=3):
-            cells=[(37,34)]
-            x=37
-            for y,target in zip(range(35,39),(*targets,39)):
-                cells.append((x,y))
-                while x!=target:
-                    x+=1 if target>x else -1
-                    cells.append((x,y))
-            if len(cells)<=19 and (seed is not None or tuple(cells)!=self._previous_path):
-                candidates.append(cells)
-        cells=rng.choice(candidates)
-        if seed is None:type(self)._previous_path=tuple(cells)
-        self.objects_path=cells
-        definitions=self.data['objects']
-        self.data['objects']=[o for o in definitions if o['type']!='footprint']
-        for i,cell in enumerate(cells):
-            self.data['objects'].append(dict(id=f'step_{i}',type='footprint',cell=cell,
-                puzzle_id='path_green',visible_state='ghost',interaction_allowed=False,text=''))
-        puzzle=next(p for p in self.data['puzzles'] if p['id']=='path_green')
-        puzzle['solution']=[f'step_{i}' for i in range(len(cells))]
-        puzzle['required_clues']=list(puzzle['solution'])
+    def solve(self, pid, obj):
+        puzzle = self.puzzles.puzzles[pid]
+        if puzzle.solved: return
+        puzzle.solved = True
+        self.puzzles.rewards.append(dict(puzzle.reward))
+        next(o for o in self.objects if o.id == pid+'_chest').state = 'closed'
+        self.notify('solved', 'Le mecanisme cede ! Ouvrez le coffre avec E.', obj)
 
     def passable(self, x, y, ghost=None):
         ghost = self.ghost if ghost is None else ghost
@@ -92,8 +88,10 @@ class PuzzleLevel(TrainingLevel):
         if tile == '#': return False
         if tile == 'Y': return ghost
         for obj in getattr(self, 'objects', []):
-            if obj.cell == (x,y) and obj.type == 'door':
-                return obj.state == 'open'
+            if obj.cell == (x,y):
+                if obj.type == 'door': return obj.state == 'open'
+                if obj.type == 'wall': return obj.state == 'broken'
+                if obj.type in ('tomb','statue') and not ghost: return False
         return True
 
     def notify(self, kind, message, obj=None, puzzle_id=None):
@@ -107,13 +105,21 @@ class PuzzleLevel(TrainingLevel):
     def return_to_body(self):
         # Position actuelle (fantome), pas celle du corps laisse en buvant le
         # poison : on ressuscite la ou on se trouve, pas la ou on est mort.
-        restored = self.mode.return_to_alive(self.position)
+        destination = self.position.copy()
+        if not self.passable(*self.cell, ghost=False):
+            cx,cy=self.cell
+            candidates=[(cx+dx,cy+dy) for dx,dy in ((0,1),(0,-1),(1,0),(-1,0))
+                        if self.passable(cx+dx,cy+dy,ghost=False)]
+            if not candidates:
+                self.say('Eloignez-vous du decor pour reprendre vie.')
+                return
+            destination=self.center(candidates[0])
+        restored = self.mode.return_to_alive(destination)
         if restored is None:
             self.notify('wrong','Plus de potions de resurrection. Attendez la fin du temps fantome.')
             return
         self.position.update(restored)
         self.cooldown = 5.0
-        self.previous_path_cell = None
         self.notify('return','Retour au corps. Poison disponible dans 5 secondes.')
 
     def action(self, key):
@@ -131,7 +137,7 @@ class PuzzleLevel(TrainingLevel):
             if self.ghost:
                 self.say('Le fantome observe mais ne peut pas agir sur les objets.')
                 return
-            nearby = [o for o in self.objects if o.type in ('statue','lever','door','sign','chest') and (o.type != 'chest' or o.state == 'closed') and self.center(o.cell).distance_to(self.position) <= 23]
+            nearby = [o for o in self.objects if o.type in ('statue','tomb','wall','door','sign','chest') and (o.type != 'chest' or o.state == 'closed') and (o.type != 'door' or o.state != 'open') and self.center(o.cell).distance_to(self.position) <= 23]
             if nearby:
                 min(nearby,key=lambda o:self.center(o.cell).distance_to(self.position)).interact(self)
 
@@ -142,6 +148,9 @@ class PuzzleLevel(TrainingLevel):
             return 'read'
         if obj.type == 'door':
             if obj.state == 'open': return 'open'
+            if obj.text == 'future':
+                self.say('Cle argentee conservee. Cette porte speciale sera disponible plus tard.')
+                return 'locked'
             if set(obj.required_keys) <= self.keys:
                 obj.state = 'open'
                 self.notify('door','La porte est ouverte.',obj)
@@ -165,65 +174,62 @@ class PuzzleLevel(TrainingLevel):
             self.keys.add(obj.key_id)
             self.keys_collected = len(self.keys)
             self.collected_key_positions.add(obj.cell)
-            self.notify('key',f'Cle {obj.key_id} obtenue ! {len(self.keys)}/3.',obj)
+            color_name={'blue':'bleue','red':'rouge','green':'verte','silver':'argentee'}[obj.key_id]
+            message = ('Cle argentee obtenue ! Conservez-la pour la future porte speciale.' if obj.key_id=='silver'
+                       else f'Cle {color_name} obtenue ! Cherchez la porte de meme couleur sur M.')
+            self.notify('key',message,obj)
             return 'collected'
-        if obj.type in ('statue','lever'):
-            result = self.puzzles.submit(obj.puzzle_id,obj.id)
-            self.apply_result(obj.puzzle_id,result)
-            return result
+        if obj.type == 'tomb':
+            if obj.id == 'tomb_'+str(self.targets['tomb']):
+                obj.state = 'open'
+                self.solve('tomb', obj)
+                return 'solved'
+            obj.state = 'searched'
+            self.notify('wrong', 'Cette tombe est vide. Une aura guide les fantomes.', obj)
+            return 'wrong'
+        if obj.type == 'wall':
+            if obj.state == 'broken': return 'open'
+            if obj.id != 'wall_'+str(self.targets['wall']):
+                self.notify('wrong', 'La pierre resiste. Cherchez la fissure en fantome.', obj)
+                return 'wrong'
+            self.wall_hits += 1
+            if self.wall_hits >= 3:
+                obj.state = 'broken'
+                self.solve('wall', obj)
+                return 'solved'
+            self.notify('correct', f'CRAC ! La pierre se fissure ({self.wall_hits}/3).', obj)
+            return 'correct'
+        if obj.type == 'statue':
+            if self.puzzles.puzzles['statue'].solved: return 'already_solved'
+            delta = self.center(obj.cell)-self.position
+            if abs(delta.x)>abs(delta.y): direction=(1 if delta.x>0 else -1,0)
+            else: direction=(0,1 if delta.y>0 else -1)
+            target=(obj.cell[0]+direction[0],obj.cell[1]+direction[1])
+            # Garder une couronne libre pour toujours pouvoir contourner la statue.
+            if not pygame.Rect(36,35,3,3).collidepoint(target):
+                self.say('Limite du socle. Contournez la statue pour la pousser autrement.')
+                return 'blocked'
+            self.statue_motion=(obj.cell,target,self.time)
+            obj.cell=target
+            self.notify('correct', 'La statue glisse sur les dalles.', obj)
+            if target == self.targets['statue']:
+                obj.state='active'
+                self.solve('statue',obj)
+                return 'solved'
+            return 'correct'
         return 'blocked'
 
-    def apply_result(self, puzzle_id, result):
-        puzzle = self.puzzles.puzzles[puzzle_id]
-        for obj in self.objects:
-            if obj.puzzle_id == puzzle_id and obj.type in ('statue','lever'):
-                obj.state = 'active' if obj.id in puzzle.current_sequence else 'idle'
-        messages = {'unobserved':'Les indices vous echappent. Observez-les en fantome.',
-                    'correct':'Bonne activation ! Continuez dans le bon ordre.',
-                    'wrong':'Mauvais ordre. La sequence recommence, sans perte.',
-                    'solved':'Le sanctuaire repond ! Un coffre apparait. E pour l ouvrir.'}
-        if result == 'solved':
-            chest = next(o for o in self.objects if o.type == 'chest' and o.puzzle_id == puzzle_id)
-            chest.state = 'closed'
-        if result in messages:
-            self.notify('wrong' if result in ('wrong','unobserved') else result,messages[result],puzzle_id=puzzle_id)
-
-    def reset_path(self):
-        self.puzzles.reset('path_green')
-        self.position.update(self.center(self.data['danger_room']['reset_cell']))
-        self.previous_path_cell = None
-        self.notify('wrong','Mauvaise dalle : retour a l entree de la salle. Vos cles sont conservees.')
-
     def process_cell(self):
-        if self.ghost:
-            for obj in self.objects:
-                if obj.type in ('clue','footprint') and self.center(obj.cell).distance_to(self.position) <= 24:
-                    if self.puzzles.observe(obj.puzzle_id,obj.id,True):
-                        self.notify('clue',obj.text or 'Suivez le courant des empreintes. Retenez ses detours.',obj)
-            nearby=[o for o in self.objects if o.type=='clue' and self.center(o.cell).distance_to(self.position)<=20]
-            if nearby:
-                nearest=min(nearby,key=lambda o:self.center(o.cell).distance_to(self.position))
-                self.say(nearest.text)
-            return
-        path = self.puzzles.puzzles['path_green']
-        danger = pygame.Rect(self.data['danger_room']['rect'])
-        if danger.collidepoint(self.cell) and not path.solved:
-            if self.previous_path_cell != self.cell:
-                self.previous_path_cell = self.cell
-                footprint = next((o for o in self.objects if o.type == 'footprint' and o.cell == self.cell),None)
-                result = self.puzzles.submit('path_green',footprint.id if footprint else 'trap')
-                if result in ('wrong','unobserved'):
-                    self.reset_path()
-                    return
-                if result in ('correct','solved'): self.apply_result('path_green',result)
-        elif not danger.collidepoint(self.cell):
-            if path.current_sequence and not path.solved: self.puzzles.reset('path_green')
-            self.previous_path_cell = None
+        room=self.trial_room
+        if room != self.last_room:
+            self.last_room=room
+            hints={'tomb':'La tombe cachee : P revele une aura. Revenez vivant et fouillez avec E.',
+                   'statue':'Le gardien : P revele le socle. Vivant, placez-vous derriere la statue et poussez avec E.',
+                   'wall':'Le mur condamne : cherchez la rune avec P. Vivant, frappez trois fois avec E.'}
+            if room: self.say(hints[room])
+        if self.ghost: return
         for obj in self.objects:
             if obj.type == 'key' and obj.cell == self.cell: obj.interact(self)
-        if self.tile(*self.cell) == 'E' and {'blue','red','green'} <= self.keys:
-            self.won = True
-            self.notify('solved','Trois mondes compris. Le sanctuaire vous laisse partir !')
 
     def update(self, dt, direction=(0,0)):
         if self.won or self.lost: return
@@ -240,7 +246,6 @@ class PuzzleLevel(TrainingLevel):
         if restored is not None:
             self.position.update(restored)
             self.cooldown = 5.0
-            self.previous_path_cell = None
             self.notify('return','Le temps est ecoule : retour au corps sans consommer de potion.')
         direction = pygame.Vector2(direction)
         if direction.length_squared(): direction = direction.normalize()

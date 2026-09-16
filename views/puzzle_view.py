@@ -9,7 +9,7 @@ from views.pixel_effects import DANGER_COLOR, lerp_color
 from views.sanctuary_feedback import SanctuaryFeedback
 from views.simple_map_view import SimpleMapGame, SIZE, VIEW, SIDEBAR, SIDEBAR_W, GOLD, INK, WHITE
 
-COLORS = {'blue':(105,193,255),'red':(245,120,119),'green':(133,226,162)}
+COLORS = {'blue':(105,193,255),'red':(245,120,119),'green':(133,226,162),'silver':(218,230,244)}
 
 
 class PuzzleGame(SimpleMapGame):
@@ -19,6 +19,7 @@ class PuzzleGame(SimpleMapGame):
         self.feedback_fx = SanctuaryFeedback()
         self.text_commands=[]
         self.display_fonts={}
+        self.music_paused = False
 
     def label(self,screen,text,position,color=WHITE,font=None):
         self.text_commands.append((str(text),position,color,font or self.font,screen.get_clip().copy()))
@@ -47,12 +48,18 @@ class PuzzleGame(SimpleMapGame):
         simulation_dt=self.feedback_fx.advance(dt)
         super().update(simulation_dt,direction)
         self.drain_events()
+        silent = self.level.trial_room is not None
+        if pygame.mixer.get_init() and silent != self.music_paused:
+            if silent: pygame.mixer.music.pause()
+            else: pygame.mixer.music.unpause()
+            self.music_paused = silent
         dx,dy=self.feedback_fx.shake()
         self.camera.x+=dx
         self.camera.y+=dy
 
     def event(self,key):
-        if key == pygame.K_r:
+        if key in (pygame.K_r, pygame.K_n):
+            if pygame.mixer.get_init(): pygame.mixer.music.unpause()
             self.__init__()
             return
         if self.feedback_fx.freeze_remaining>0 and key not in (pygame.K_m,pygame.K_r):
@@ -76,7 +83,7 @@ class PuzzleGame(SimpleMapGame):
         if not self.map_open and not self.level.won:
             success=next((p for p in reversed(self.feedback_fx.pulses) if p.kind=='solved' and .3<p.age<1.9),None)
             if success:
-                title={'statues_blue':'LE SERMENT DES VEILLEURS','levers_red':'LES VOIX S ACCORDENT','path_green':'LE CHEMIN SE SOUVIENT'}.get(success.puzzle_id,'LE SANCTUAIRE REPOND')
+                title={'tomb':'LE SECRET DES TOMBES','statue':'LE GARDIEN SE REVEILLE','wall':'LA PIERRE SE DECHIRE'}.get(success.puzzle_id,'LE SANCTUAIRE REPOND')
                 width=self.small.size(title)[0]+20
                 rect=pygame.Rect((VIEW.w-width)//2,VIEW.y+10,width,22)
                 veil=pygame.Surface(rect.size,pygame.SRCALPHA);veil.fill((12,18,27,210))
@@ -94,50 +101,49 @@ class PuzzleGame(SimpleMapGame):
 
     def draw_special_tiles(self,screen,level):
         super().draw_special_tiles(screen,level)
-        # Le vivant ne distingue pas les cases sures des pieges.
-        danger=pygame.Rect(level.data['danger_room']['rect'])
-        for y in range(danger.top,danger.bottom):
-            for x in range(danger.left,danger.right):
-                px,py=self.point(level.center((x,y)))
-                pygame.draw.rect(screen,(65,71,73),(px-7,py-7,14,14))
-                pygame.draw.rect(screen,(114,119,111),(px-6,py-6,12,12),1)
         for obj in sorted(level.objects,key=lambda o: 0 if o.type=='chest' else (2 if o.type=='key' else 1)):
             if not obj.visible_to(level): continue
             if obj.type in ('clue','footprint') and level.center(obj.cell).distance_to(level.position)>52: continue
             x,y=self.point(level.center(obj.cell))
-            if obj.type in ('statue','lever'):
-                active=obj.state=='active'
-                age=self.feedback_fx.age('solved',puzzle_id=obj.puzzle_id)
-                sequence=level.puzzles.puzzles[obj.puzzle_id].solution
-                glowing=active and (age is None or age>=sequence.index(obj.id)*.10)
-                color=(132,224,207) if glowing else (147,142,133)
-                if glowing:
-                    pygame.draw.circle(screen,(48,91,87),(x,y),8,1)
-                pygame.draw.rect(screen,(47,52,57),(x-5,y-4,10,10))
+            if obj.type in ('tomb','statue','wall','socket'):
+                spectral = level.ghost and (
+                    (obj.type=='tomb' and obj.id=='tomb_'+str(level.targets['tomb'])) or
+                    (obj.type=='wall' and obj.id=='wall_'+str(level.targets['wall'])) or
+                    (obj.type=='socket' and obj.cell==level.targets['statue']))
                 if obj.type=='statue':
-                    pygame.draw.circle(screen,color,(x,y-6),4)
+                    if level.statue_motion:
+                        start,end,when=level.statue_motion
+                        t=min(1,max(0,(level.time-when)/.22))
+                        x,y=self.point(level.center(start).lerp(level.center(end),t*t*(3-2*t)))
+                    pygame.draw.ellipse(screen,(35,40,48),(x-7,y+3,14,5))
+                    pygame.draw.rect(screen,(108,117,133),(x-5,y-5,10,11))
+                    pygame.draw.circle(screen,(184,192,199),(x,y-9),5)
+                    pygame.draw.line(screen,GOLD,(x-3,y-10),(x+3,y-10),2)
+                elif obj.type=='socket':
+                    pygame.draw.rect(screen,(133,125,104),(x-6,y-6,12,12),1)
+                elif obj.type=='tomb':
+                    pygame.draw.rect(screen,(49,49,61),(x-6,y-7,12,15),border_radius=3)
+                    pygame.draw.rect(screen,(148,151,163),(x-5,y-8,10,12),1,border_radius=3)
+                    pygame.draw.line(screen,(185,179,160),(x,y-6),(x,y+1))
+                    pygame.draw.line(screen,(185,179,160),(x-2,y-3),(x+2,y-3))
+                    if obj.state=='open': pygame.draw.ellipse(screen,(9,13,21),(x-4,y+1,8,5))
+                elif obj.state=='broken':
+                    for i in range(5):
+                        pygame.draw.rect(screen,(131,126,118),(x-6+i*3,y+3+(i%2)*2,3,2))
                 else:
-                    pygame.draw.line(screen,color,(x,y+2),(x+(4 if active else -4),y-5),2)
-                self.label(screen,obj.text,(x-3,y+5),GOLD,self.small)
-            elif obj.type=='clue':
-                # L'inscription se dechiffre en approchant ; pas de code expose au loin.
-                angle=self.elapsed*1.2
-                pygame.draw.circle(screen,(90,157,170),(x,y),5,1)
-                for i in range(3):
-                    px=x+round(math.cos(angle+i*math.tau/3)*4)
-                    py=y+round(math.sin(angle+i*math.tau/3)*4)
-                    pygame.draw.rect(screen,(162,235,231),(px,py,1,1))
-            elif obj.type=='footprint':
-                sequence=level.puzzles.puzzles[obj.puzzle_id].solution
-                index=sequence.index(obj.id)
-                pygame.draw.ellipse(screen,(134,225,215),(x-4,y-2,3,5))
-                pygame.draw.ellipse(screen,(134,225,215),(x+1,y-3,3,5))
-                if index+1<len(sequence):
-                    next_obj=next(o for o in level.objects if o.id==sequence[index+1])
-                    direction=pygame.Vector2(next_obj.cell)-obj.cell
-                    phase=(self.elapsed*1.3)%1
-                    pos=pygame.Vector2(x,y)+direction*(phase*12)
-                    pygame.draw.circle(screen,(201,255,234),(round(pos.x),round(pos.y)),1)
+                    pygame.draw.rect(screen,(109,108,113),(x-8,y-8,16,16))
+                    for offset in (-7,0,7): pygame.draw.line(screen,(53,56,65),(x-8,y+offset),(x+7,y+offset))
+                    pygame.draw.line(screen,(53,56,65),(x,y-7),(x,y+7))
+                    if obj.id=='wall_'+str(level.targets['wall']) and level.wall_hits:
+                        pygame.draw.lines(screen,(22,24,31),False,[(x-1,y-7),(x+2,y-2),(x-2,y+2),(x+2,y+6)],level.wall_hits)
+                if spectral:
+                    color=(147,242,239)
+                    radius=9+round(2*math.sin(self.elapsed*4))
+                    pygame.draw.ellipse(screen,color,(x-radius,y-5,radius*2,10),1)
+                    for i in range(7):
+                        angle=self.elapsed*2+i*math.tau/7
+                        pygame.draw.circle(screen,color,(round(x+math.cos(angle)*radius),round(y-9+math.sin(angle)*7)),1)
+                    self.label(screen,'*',(x-3,y-23-round(math.sin(self.elapsed*3)*3)),color,self.small)
             elif obj.type=='chest':
                 if obj.state=='hidden':continue
                 self.draw_chest(screen,obj,x,y)
@@ -148,7 +154,9 @@ class PuzzleGame(SimpleMapGame):
                 age=.65-(level.key_ready_at[obj.id]-level.time)
                 lift=round(10*min(1,max(0,age/.65)))
                 screen.blit(self.key_glow,(x-14,y-14+bob-lift),special_flags=pygame.BLEND_RGBA_ADD)
-                frame=self.tiles.art['key']
+                frame=pygame.mask.from_surface(self.tiles.art['key']).to_surface(
+                    setcolor=(*COLORS.get(obj.key_id,GOLD),255),unsetcolor=(0,0,0,0))
+                pygame.draw.circle(screen,COLORS.get(obj.key_id,GOLD),(x,y-10+bob),9,1)
                 screen.blit(frame,(x-frame.get_width()//2,y-frame.get_height()//2+bob-lift))
             elif obj.type=='door':
                 color=COLORS.get(obj.required_keys[0],GOLD) if len(obj.required_keys)==1 else GOLD
@@ -200,7 +208,9 @@ class PuzzleGame(SimpleMapGame):
                (f'Recharge : {level.cooldown:.1f}s' if level.cooldown else 'Poison pret',WHITE),
                (f'Cles : {len(level.keys)}/3',GOLD)]
         for i,(text,color) in enumerate(lines):self.label(screen,text,(x,14+i*16),color,self.small)
-        message=level.message if level.message_time>0 else 'Chapelle : statues. Jardin : chemin. Bibliotheque : leviers.'
+        for i,key in enumerate(sorted(level.keys)):
+            self.label(screen,{'blue':'Bleue','red':'Rouge','green':'Verte','silver':'Argentee'}[key],(x,115+i*13),COLORS[key],self.small)
+        message=level.message if level.message_time>0 else 'P : indice spectral. E : fouiller / pousser / frapper. M : zones jaunes.'
         for i,line in enumerate(textwrap.wrap(message,23)[:6]):
             self.label(screen,line,(x,172+i*12),WHITE,self.small)
         for i,line in enumerate(['P : fantome / retour','Entree : retour','E : interagir','M : carte / pause','R : tout recommencer','F11 : fenetre / ecran']):
@@ -217,6 +227,20 @@ class PuzzleGame(SimpleMapGame):
         # L'atlas montre la geometrie mais jamais les solutions des enigmes.
         self.text_commands.clear()
         super().draw_map(screen)
+        box=pygame.Rect(15,15,SIZE[0]-30,SIZE[1]-30)
+        scale=min((box.w-10)/self.map_w,(box.h-10)/self.map_h)
+        origin=(box.centerx-round(self.map_w*scale)//2,box.centery-round(self.map_h*scale)//2)
+        unit=self.level.tile_size*scale
+        for pid,room in self.level.rooms.items():
+            rect=pygame.Rect(round(origin[0]+room.x*unit),round(origin[1]+room.y*unit),round(room.w*unit),round(room.h*unit))
+            veil=pygame.Surface(rect.size,pygame.SRCALPHA); veil.fill((255,207,42,85))
+            screen.blit(veil,rect)
+            pygame.draw.rect(screen,(255,219,72),rect,2)
+            self.label(screen,'OK' if self.level.puzzles.puzzles[pid].solved else '?',(rect.centerx-3,rect.centery-5),(255,239,136))
+            door=next(o for o in self.level.objects if o.id=='entry_'+pid)
+            dx=round(origin[0]+(door.cell[0]+.5)*unit);dy=round(origin[1]+(door.cell[1]+.5)*unit)
+            pygame.draw.circle(screen,COLORS.get(door.required_keys[0],GOLD) if door.required_keys else WHITE,(dx,dy),3,1 if door.state=='open' else 0)
+        self.label(screen,'Jaune ? : epreuve | Points colores : portes',(box.x+10,box.bottom-13),GOLD,self.small)
 
     def draw_win(self,screen):
         self.text_commands.clear()
@@ -252,6 +276,7 @@ def run(window):
             if '--smoke-test' in sys.argv:
                 return 'menu'
     finally:
+        if pygame.mixer.get_init(): pygame.mixer.music.unpause()
         # Ne pas laisser la reverberation de la partie jouer sur le menu.
         for sound in game.feedback_fx.sounds.values():
             sound.stop()

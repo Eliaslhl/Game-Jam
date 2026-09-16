@@ -97,7 +97,7 @@ class SanctuaryFeedback:
         return None
 
     def shake(self):
-        strength=max((2.0*(1-p.age/.35) for p in self.pulses if p.kind in ('solved','door','wrong') and p.age<.35),default=0)
+        strength=max((2.0*(1-p.age/.35) for p in self.pulses if (p.kind in ('solved','door','wrong') or (p.kind=='correct' and p.puzzle_id=='wall')) and p.age<.35),default=0)
         return math.sin(self.clock*83)*strength,math.cos(self.clock*71)*strength*.5
 
     def draw(self,screen,game):
@@ -121,6 +121,14 @@ class SanctuaryFeedback:
             else:
                 radius=int(4+24*progress)
                 pygame.draw.circle(layer,(*color,int(160*(1-progress))),(x,y),radius,1)
+            if pulse.puzzle_id=='wall' and pulse.kind in ('correct','solved'):
+                rubble=random.Random(pulse.object_id)
+                for i in range(28 if pulse.kind=='solved' else 10):
+                    vx=rubble.uniform(-45,45);vy=rubble.uniform(-65,-20)
+                    age=pulse.age
+                    px=round(x+vx*age);py=round(y+vy*age+75*age*age)
+                    alpha=round(230*max(0,1-age/1.3))
+                    pygame.draw.rect(layer,(158,151,143,alpha),(px,py,3+i%3,2+i%2))
             count=64 if pulse.kind=='solved' else (38 if pulse.kind=='chest' else 14)
             rng=random.Random(pulse.object_id or pulse.puzzle_id or pulse.kind)
             for i in range(count):
