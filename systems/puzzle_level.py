@@ -28,6 +28,9 @@ class PuzzleLevel(TrainingLevel):
         self.wall_hits = 0
         self.statue_motion = None
         self.last_room = None
+        # Consigne de l'epreuve en cours, pour pouvoir l'effacer en sortant de la
+        # salle (voir show_trial_hint).
+        self._trial_hint = None
         # Fermer l'ancien acces spectral lateral et l'ancienne sortie du jardin.
         for x,y in [(44,24),(39,39)]:
             row=list(self.grid[y]); row[x]='#'; self.grid[y]=''.join(row)
@@ -215,14 +218,33 @@ class PuzzleLevel(TrainingLevel):
             return 'correct'
         return 'blocked'
 
+    TRIAL_HINTS = {
+        'tomb': 'La tombe cachee : P revele une aura. Revenez vivant et fouillez avec E.',
+        'statue': 'Le gardien : P revele le socle. Vivant, placez-vous derriere la statue et poussez avec E.',
+        'wall': 'Le mur condamne : cherchez la rune avec P. Vivant, frappez trois fois avec E.',
+    }
+
+    def show_trial_hint(self, room):
+        """La consigne de l'epreuve reste sur le parchemin tant qu'on est dans la
+        salle, et disparait des qu'on en sort - plutot que de defiler six secondes
+        puis de laisser le joueur sans rappel au milieu de l'enigme.
+
+        Elle ne recouvre jamais un message qui vient d'arriver (cle obtenue, mur
+        qui se fissure, porte verrouillee) : celui-la passe d'abord, et la
+        consigne revient quand il s'efface."""
+        if room is None:
+            if self._trial_hint is not None and self.message == self._trial_hint:
+                self.message_time = 0
+            self._trial_hint = None
+            return
+        self._trial_hint = self.TRIAL_HINTS[room]
+        if self.message_time <= 0 or self.message in self.TRIAL_HINTS.values():
+            self.say(self._trial_hint)
+
     def process_cell(self):
-        room=self.trial_room
-        if room != self.last_room:
-            self.last_room=room
-            hints={'tomb':'La tombe cachee : P revele une aura. Revenez vivant et fouillez avec E.',
-                   'statue':'Le gardien : P revele le socle. Vivant, placez-vous derriere la statue et poussez avec E.',
-                   'wall':'Le mur condamne : cherchez la rune avec P. Vivant, frappez trois fois avec E.'}
-            if room: self.say(hints[room])
+        room = self.trial_room
+        self.last_room = room
+        self.show_trial_hint(room)
         if self.ghost: return
         for obj in self.objects:
             if obj.type == 'key' and obj.cell == self.cell: obj.interact(self)

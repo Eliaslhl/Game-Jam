@@ -30,6 +30,14 @@ from views.simple_map_view import (
 )
 
 COLORS = {'blue':(105,193,255),'red':(245,120,119),'green':(133,226,162),'silver':(218,230,244)}
+KEY_NAMES = {'blue':'Bleue','red':'Rouge','green':'Verte','silver':'Argent'}
+
+# Parchemin des messages (voir PuzzleGame.draw_parchment).
+PARCHMENT_BODY = (216, 192, 149)
+PARCHMENT_LIGHT = (236, 217, 180)
+PARCHMENT_EDGE = (120, 94, 61)
+PARCHMENT_ROLL = (170, 134, 86)
+PARCHMENT_INK = (58, 42, 30)
 
 class PuzzleGame(SimpleMapGame):
     def __init__(self):
@@ -85,6 +93,10 @@ class PuzzleGame(SimpleMapGame):
     def draw(self,screen):
         self._text_commands.clear()
         super().draw(screen)
+        # Ni sur la carte ni sur les ecrans de fin : ceux-ci effacent la file de
+        # textes pour n'afficher qu'eux, et le dernier message y ferait doublon.
+        if not self.map_open and not self.level.won and not self.level.lost:
+            self.draw_parchment(screen)
         if not self.map_open and not self.level.won:
             success=next((p for p in reversed(self.feedback_fx.pulses) if p.kind=='solved' and .3<p.age<1.9),None)
             if success:
@@ -244,10 +256,10 @@ class PuzzleGame(SimpleMapGame):
         pos["keys_label_y"] = y
         y += 12
         pos["keys_y"] = y
-        y += 24
+        y += 12 * len(self.key_ids())   # une ligne par cle
         y += 4
-        # Les messages courts restent sous les controles ; le parchemin est
-        # reserve aux futures epreuves speciales.
+        # Les messages ne sont plus ici mais sur le parchemin (draw_parchment) :
+        # la colonne ne garde que ce qui doit rester lisible en permanence.
         pos["div3_y"] = y
         y += 8
         pos["controls_label_y"] = y
@@ -305,11 +317,22 @@ class PuzzleGame(SimpleMapGame):
                 self.label(screen, "REVENEZ VITE !", (x, pos["danger_y"]), bar_color, self.tiny)
 
         pygame.draw.line(screen, DIVIDER, (x, pos["div2_y"]), (x + w, pos["div2_y"]))
+        # Une ligne par cle de la partie, a sa vraie couleur : pastille pleine et
+        # nom allume quand on l'a, pastille creuse et nom eteint tant qu'elle
+        # manque. On voit donc d'un coup d'oeil laquelle chercher, et la couleur
+        # correspond a celle de la porte a ouvrir (meme palette COLORS).
         self.label(screen, "CLES", (x, pos["keys_label_y"]), TEXT_DIM, self.tiny)
-        self._draw_key_pips(screen, x, pos["keys_y"], len(level.keys), 3)
-        for i, key in enumerate(sorted(level.keys)):
-            name={'blue':'Bleue','red':'Rouge','green':'Verte','silver':'Argent'}[key]
-            self.label(screen,name,(x+i*40,pos['keys_y']+13),COLORS[key],self.tiny)
+        for i, key_id in enumerate(self.key_ids()):
+            y = pos["keys_y"] + i * 12
+            color = COLORS.get(key_id, GOLD)
+            obtenue = key_id in level.keys
+            pastille = pygame.Rect(x, y + 1, 8, 8)
+            if obtenue:
+                pygame.draw.rect(screen, color, pastille, border_radius=2)
+            else:
+                pygame.draw.rect(screen, TEXT_DIM, pastille, width=1, border_radius=2)
+            self.label(screen, KEY_NAMES.get(key_id, key_id), (x + 14, y),
+                       color if obtenue else TEXT_DIM, self.tiny)
 
         pygame.draw.line(screen, DIVIDER, (x, pos["div3_y"]), (x + w, pos["div3_y"]))
         self.label(screen, "CONTROLES", (x, pos["controls_label_y"]), TEXT_DIM, self.tiny)
@@ -322,20 +345,64 @@ class PuzzleGame(SimpleMapGame):
             "F11 : ecran",
         ]):
             self.label(screen, line, (x, pos["controls_y"] + i * 12), (180, 192, 200), self.tiny)
-        message=level.message if level.message_time>0 else 'M : zones jaunes. P : observer. E : agir.'
-        lines=[]
-        current=''
-        for word in message.split():
-            candidate=(current+' '+word).strip()
-            if current and self.tiny.size(candidate)[0]>w:
-                lines.append(current)
-                current=word
-            else:
-                current=candidate
-        if current: lines.append(current)
-        for i,line in enumerate(lines[:6]):
-            self.label(screen,line,(x,pos['controls_y']+78+i*10),WHITE,self.tiny)
 
+
+    def key_ids(self):
+        """Les cles de la partie, dans l'ordre des epreuves. Les deux premieres
+        couleurs sont tirees au sort a chaque partie et la derniere est toujours
+        l'argentee (voir PuzzleLevel.__init__) : la colonne doit donc lire la
+        partie en cours, pas une liste de couleurs ecrite en dur."""
+        return [obj.key_id for obj in self.level.objects if obj.type == 'key']
+
+    def _wrap_to_width(self, text, font, width):
+        """Coupe le texte en lignes qui tiennent dans `width` (repere du canevas),
+        en mesurant vraiment la police : la MedievalSharp est a chasse variable,
+        compter les caracteres donnerait des lignes trop courtes ou qui debordent."""
+        lines, current = [], ""
+        for word in str(text).split():
+            candidate = f"{current} {word}".strip()
+            if current and font.size(candidate)[0] > width:
+                lines.append(current)
+                current = word
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        return lines
+
+    def draw_parchment(self, screen):
+        """Tous les messages du sanctuaire s'affichent ici, sur un parchemin
+        deroule en bas de la zone de jeu, plutot que tasses dans la colonne de
+        droite : les consignes des epreuves sont des phrases entieres, il leur
+        faut de la place pour etre lues. Le parchemin ne met pas le jeu en pause
+        et il est pose sous le joueur, jamais dessus."""
+        level = self.level
+        if level.message_time <= 0 or not level.message:
+            return
+
+        margin, roll_w, padding, line_h = 12, 6, 11, 16
+        text_w = VIEW.w - 2 * (margin + roll_w + padding)
+        lines = self._wrap_to_width(level.message, self.font, text_w)[:4]
+        body = pygame.Rect(0, 0, VIEW.w - 2 * (margin + roll_w), len(lines) * line_h + 2 * padding)
+        body.bottomleft = (margin + roll_w, VIEW.bottom - margin)
+
+        # Feuille : fond clair, lisere sombre, et une ligne claire en haut pour
+        # donner l'impression d'un papier legerement bombe.
+        pygame.draw.rect(screen, PARCHMENT_BODY, body)
+        pygame.draw.rect(screen, PARCHMENT_EDGE, body, 1)
+        pygame.draw.line(screen, PARCHMENT_LIGHT, (body.x + 1, body.y + 1), (body.right - 2, body.y + 1))
+
+        # Les deux rouleaux, aux extremites, debordent un peu en hauteur.
+        for roll_x in (body.x - roll_w, body.right):
+            roll = pygame.Rect(roll_x, body.y - 3, roll_w, body.h + 6)
+            pygame.draw.rect(screen, PARCHMENT_ROLL, roll, border_radius=3)
+            pygame.draw.rect(screen, PARCHMENT_EDGE, roll, 1, border_radius=3)
+
+        for i, line in enumerate(lines):
+            self.label(
+                screen, line, (body.centerx, body.y + padding + i * line_h),
+                PARCHMENT_INK, self.font, align="center",
+            )
 
     def draw_map(self,screen):
         # L'atlas montre la geometrie mais jamais les solutions des enigmes.
