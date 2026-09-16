@@ -28,14 +28,19 @@ MENU_ITEMS = [
     ("Quitter", "quit"),
 ]
 
+# Proportions du menu, exprimees pour une hauteur d'ecran de reference de 720 px
+# (voir MenuScene : tout est remis a l'echelle de l'ecran reel, le menu etant
+# maintenant en plein ecran et donc a une resolution qui varie d'une machine a
+# l'autre). Le logo est carre ; sa taille est choisie pour que "Witch or Ghost"
+# reste lisible dedans sans ecraser les boutons.
+REFERENCE_HEIGHT = 720
 BUTTON_WIDTH = 250
 BUTTON_HEIGHT = 56
 BUTTON_GAP = 16
-
-# Cote du logo (il est carre) : assez grand pour que "Witch or Ghost" reste
-# lisible dedans, assez petit pour laisser respirer les boutons en dessous.
 LOGO_SIZE = 220
 LOGO_GAP = 28
+TITLE_FONT_SIZE = 48
+BUTTON_FONT_SIZE = 20
 
 
 def _load_logo(size: int):
@@ -104,34 +109,48 @@ class Button:
 class MenuScene:
     def __init__(self, screen: pygame.Surface) -> None:
         self.screen = screen
-        self.title_font = pygame.font.Font(str(TITLE_FONT_FILE), 48)
-        self.button_font = pygame.font.Font(str(UI_FONT_FILE), 20)
+        # Le menu est en plein ecran : sa taille depend de la machine, donc tout
+        # est dimensionne a partir de la hauteur reelle plutot qu'en pixels fixes.
+        # La largeur ne sert qu'a centrer, pour que le menu garde les memes
+        # proportions en 16/9 comme en 16/10 ou en ultra-large.
+        width, height = screen.get_size()
+        scale = height / REFERENCE_HEIGHT
+
+        def px(value: int) -> int:
+            return max(1, round(value * scale))
+
+        self.title_font = pygame.font.Font(str(TITLE_FONT_FILE), px(TITLE_FONT_SIZE))
+        self.button_font = pygame.font.Font(str(UI_FONT_FILE), px(BUTTON_FONT_SIZE))
+
+        logo_size = px(LOGO_SIZE)
+        button_w, button_h = px(BUTTON_WIDTH), px(BUTTON_HEIGHT)
+        button_gap, logo_gap = px(BUTTON_GAP), px(LOGO_GAP)
 
         # Le logo remplace le titre ecrit ; celui-ci ne sert plus que de repli
         # si l'image n'est pas la (clone du depot sans les assets, par exemple).
-        self.logo = _load_logo(LOGO_SIZE)
+        self.logo = _load_logo(logo_size)
 
         # Logo et boutons forment un seul bloc, centre verticalement avec un
         # leger decalage vers le haut : le regard tombe d'abord sur le logo.
-        buttons_height = len(MENU_ITEMS) * BUTTON_HEIGHT + (len(MENU_ITEMS) - 1) * BUTTON_GAP
-        block_height = LOGO_SIZE + LOGO_GAP + buttons_height
-        block_top = (SCREEN_HEIGHT - block_height) // 2 - 36
-        logo_center_y = block_top + LOGO_SIZE // 2
-        first_button_center_y = block_top + LOGO_SIZE + LOGO_GAP + BUTTON_HEIGHT // 2
+        buttons_height = len(MENU_ITEMS) * button_h + (len(MENU_ITEMS) - 1) * button_gap
+        block_height = logo_size + logo_gap + buttons_height
+        block_top = (height - block_height) // 2 - px(36)
+        logo_center_y = block_top + logo_size // 2
+        first_button_center_y = block_top + logo_size + logo_gap + button_h // 2
 
         self.logo_rect = None
         self.title_surface = None
         self.title_rect = None
         if self.logo is not None:
-            self.logo_rect = self.logo.get_rect(center=(SCREEN_WIDTH // 2, logo_center_y))
+            self.logo_rect = self.logo.get_rect(center=(width // 2, logo_center_y))
         else:
             self.title_surface = self.title_font.render("Witch or Ghost", True, GOLD)
-            self.title_rect = self.title_surface.get_rect(center=(SCREEN_WIDTH // 2, logo_center_y))
+            self.title_rect = self.title_surface.get_rect(center=(width // 2, logo_center_y))
 
         self.buttons = []
         for i, (label, action) in enumerate(MENU_ITEMS):
-            rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
-            rect.center = (SCREEN_WIDTH // 2, first_button_center_y + i * (BUTTON_HEIGHT + BUTTON_GAP))
+            rect = pygame.Rect(0, 0, button_w, button_h)
+            rect.center = (width // 2, first_button_center_y + i * (button_h + button_gap))
             self.buttons.append(Button(label, action, rect))
 
     def handle_event(self, event: pygame.event.Event) -> str | None:
@@ -151,18 +170,14 @@ class MenuScene:
             button.draw(self.screen, self.button_font)
 
 
-def _new_window() -> pygame.Surface:
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption(SCREEN_TITLE)
-    return screen
-
-
 def _fullscreen_window() -> pygame.Surface:
-    """Fenetre plein ecran reel (sans bandes du bureau), pour la partie et le
-    tutoriel uniquement : le menu, lui, reste dans sa fenetre normale."""
+    """Fenetre plein ecran reel (sans bandes du bureau). Tout le jeu s'y tient
+    desormais : le menu comme la partie et le tutoriel, donc plus aucun
+    changement de resolution entre les deux."""
     desktop = pygame.display.Info()
     desktop_size = (desktop.current_w or SCREEN_WIDTH, desktop.current_h or SCREEN_HEIGHT)
     screen = pygame.display.set_mode(desktop_size, pygame.FULLSCREEN)
+    pygame.display.set_caption(SCREEN_TITLE)
     return screen
 
 
@@ -178,17 +193,15 @@ def run(screen: pygame.Surface) -> None:
 
             action = scene.handle_event(event)
             if action == "play":
-                # Plein ecran pour la partie, puis retour a la fenetre du menu.
-                fullscreen = _fullscreen_window()
-                if puzzle_view.run(fullscreen) == 'quit':
+                if puzzle_view.run(screen) == 'quit':
                     return
-                screen = _new_window()
+                # La partie a pu changer de resolution (F11) : on reprend la
+                # fenetre courante et on recalcule la mise en page dessus.
+                screen = _fullscreen_window()
                 scene = MenuScene(screen)
             elif action == "tutorial":
-                # Plein ecran pour le tutoriel, puis retour a la fenetre du menu.
-                fullscreen = _fullscreen_window()
-                training_map_view.run(fullscreen)
-                screen = _new_window()
+                training_map_view.run(screen)
+                screen = _fullscreen_window()
                 scene = MenuScene(screen)
             elif action == "quit":
                 return
@@ -214,7 +227,7 @@ def main() -> None:
         except (pygame.error, OSError) as error:
             print(f"Musique indisponible : {error}")
 
-        screen = _new_window()
+        screen = _fullscreen_window()
         run(screen)
     finally:
         if music_started:
