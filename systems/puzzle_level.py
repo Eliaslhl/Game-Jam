@@ -15,7 +15,6 @@ class PuzzleLevel(TrainingLevel):
     _previous_path = None
     def __init__(self, path=MAP_PATH, seed=None):
         super().__init__(path)
-        self.mode.auto_return_on_timeout = True
         self.generate_path(seed)
         self.puzzles = PuzzleManager(self.data['puzzles'], seed=seed)
         self.objects = [PuzzleObject.from_data(d) for d in self.data['objects']]
@@ -103,7 +102,7 @@ class PuzzleLevel(TrainingLevel):
         self.notify('return','Retour au corps. Poison disponible dans 5 secondes.')
 
     def action(self, key):
-        if self.won: return
+        if self.won or self.lost: return
         if key in (pygame.K_p, pygame.K_RETURN) and self.ghost:
             self.return_to_body()
         elif key == pygame.K_p:
@@ -212,13 +211,17 @@ class PuzzleLevel(TrainingLevel):
             self.notify('solved','Trois mondes compris. Le sanctuaire vous laisse partir !')
 
     def update(self, dt, direction=(0,0)):
-        if self.won: return
+        if self.won or self.lost: return
         dt = max(0,dt)
         self.time += dt
         self.message_time = max(0,self.message_time-dt)
         self.feedback_time = max(0,self.feedback_time-dt)
         if not self.ghost: self.cooldown = max(0,self.cooldown-dt)
         restored = self.mode.update(dt)
+        if self.dead:
+            self.lost = True
+            self.notify('wrong','Le temps est ecoule : vous etes mort. N pour recommencer.')
+            return
         if restored is not None:
             self.position.update(restored)
             self.cooldown = 5.0
@@ -233,6 +236,11 @@ class PuzzleLevel(TrainingLevel):
                 candidate = self.position.copy()
                 setattr(candidate,axis,getattr(candidate,axis)+getattr(move/steps,axis))
                 if not self.blocked(candidate): self.position.update(candidate)
+            if self.holes.is_lethal(self.cell):
+                self.mode.die()
+                self.lost = True
+                self.notify('wrong','Un trou spectral vous a englouti.')
+                return
             old = self.position.copy()
             self.process_cell()
             if self.position != old: break
