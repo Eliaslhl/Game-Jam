@@ -80,7 +80,13 @@ class GameView:
 
         for x, y, tile in self.objets:
             center = self._center((x, y))
-            color = {CLE: (240, 210, 65), FIOLE: (150, 90, 220), LEVIER: (220, 100, 65), SORTIE: (80, 210, 130)}[tile]
+            color = {
+                CLE: (240, 210, 65),
+                FIOLE: (150, 90, 220),
+                LEVIER: (220, 100, 65),
+                SORTIE: (80, 210, 130),
+                PORTE: (139, 94, 60),
+            }[tile]
             pygame.draw.circle(self.screen, color, center, TILE_SIZE // 5)
 
         for corpse in self.cadavres:

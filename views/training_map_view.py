@@ -6,27 +6,16 @@ import textwrap
 
 import pygame
 
+from entities.ghost import YureiWalk
 from systems.training_level import TrainingLevel
 from views.pixel_art import PixelTiles
+from views.pixel_effects import make_glow
 
 SIZE = (320, 150)
 VIEW = pygame.Rect(0, 24, 320, 48)
 GOLD = (224, 191, 119)
 INK = (12, 17, 25)
 WHITE = (222, 225, 216)
-
-# Petit fantome ASCII local (pas d'asset Yurei sur cette branche) : meme technique
-# que pixel_art.ascii_sprite, palette a part pour ne pas toucher au fichier partage.
-GHOST_PALETTE = {".": (0, 0, 0, 0), "w": (235, 238, 240), "W": (196, 202, 208)}
-GHOST_ROWS = ["..www..", ".wwwww.", ".wWwWw.", ".wwwww.", ".wwwww.", "w.w.w.w"]
-
-
-def build_sprite(rows, palette):
-    image = pygame.Surface((max(map(len, rows)), len(rows)), pygame.SRCALPHA)
-    for y, row in enumerate(rows):
-        for x, char in enumerate(row):
-            image.set_at((x, y), palette[char])
-    return image
 
 
 class TrainingGame:
@@ -39,7 +28,8 @@ class TrainingGame:
         self.tiles_ghost_surface.fill((175, 175, 175), special_flags=pygame.BLEND_RGB_ADD)
         self.font = pygame.font.Font(None, 18)
         self.small = pygame.font.Font(None, 15)
-        self.ghost_sprite = build_sprite(GHOST_ROWS, GHOST_PALETTE)
+        self.yurei = YureiWalk()
+        self.ghost_frames = [pygame.transform.scale(f, (13, 23)) for f in self.yurei.frames]
         self.elapsed = 0.0
         self.facing_left = False
         self.moving = False
@@ -48,17 +38,18 @@ class TrainingGame:
 
         # Le plan ne change jamais : autant reperer une bonne fois les cases 'Y'/'E'
         # plutot que de rescanner toute la grille a chaque frame.
-        self.special_tiles = []
-        for y in range(self.level.height):
-            for x in range(self.level.width):
-                tile = self.level.tile(x, y)
-                if tile in "YE":
-                    self.special_tiles.append((x, y, tile))
+        self.special_tiles = [
+            (x, y, tile)
+            for y in range(self.level.height)
+            for x in range(self.level.width)
+            for tile in [self.level.tile(x, y)]
+            if tile in "YE"
+        ]
 
         # Textes qui ne changent jamais : rendus une seule fois plutot qu'a chaque frame.
         self.title_surface = self.font.render("COULOIR D'ENTRAINEMENT", True, GOLD)
         self.controls_surface = self.small.render(
-            "ZQSD / fleches : bouger   P : poison   R : vie   N : recommencer", True, (136, 149, 157)
+            "ZQSD / fleches : bouger   P : potion   R : recommencer", True, (136, 149, 157)
         )
 
     def _add_bottom_wall_torches(self):
@@ -83,7 +74,7 @@ class TrainingGame:
         self.elapsed += dt
 
     def event(self, key):
-        if key == pygame.K_n and (self.level.won or self.level.lost):
+        if key == pygame.K_r:
             self.__init__()
         else:
             self.level.action(key)
@@ -94,11 +85,7 @@ class TrainingGame:
     def glow(self, radius, strength):
         key = (radius, strength)
         if key not in self.lights:
-            light = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-            for r in range(radius, 0, -2):
-                alpha = int(strength * (1 - r / radius) ** 0.55)
-                pygame.draw.circle(light, (0, 0, 0, alpha), (radius, radius), r)
-            self.lights[key] = light
+            self.lights[key] = make_glow(radius, (0, 0, 0), strength, exponent=0.55)
         return self.lights[key]
 
     def draw(self, screen):
@@ -126,10 +113,11 @@ class TrainingGame:
         px, py = self.point(level.position)
         pygame.draw.ellipse(screen, (12, 19, 27), (px - 6, py + 2, 12, 5))
         if level.ghost:
-            frame = self.ghost_sprite
+            index = int(self.elapsed / 0.14) % len(self.ghost_frames) if self.moving else 0
+            frame = self.ghost_frames[index]
             if self.facing_left:
                 frame = pygame.transform.flip(frame, True, False)
-            screen.blit(frame, (px - 4, py - 10))
+            screen.blit(frame, (px - 6, py - 19))
         else:
             frame = self.tiles.art["player"]
             if self.facing_left:
@@ -155,8 +143,6 @@ class TrainingGame:
         self.draw_hud(screen)
         if level.won:
             self.draw_win(screen)
-        elif level.lost:
-            self.draw_loss(screen)
 
     def draw_hud(self, screen):
         level = self.level
@@ -168,18 +154,12 @@ class TrainingGame:
         pygame.draw.line(screen, (61, 65, 64), (8, 73), (SIZE[0] - 8, 73))
         status = "AME ERRANTE" if level.ghost else "VIVANT"
         self.label(screen, status, (8, 79), (154, 222, 211) if level.ghost else WHITE, self.small)
-        potions = level.mode.potions
-        self.label(
-            screen,
-            f"POISON {potions.poison_count}  VIE {potions.life_count}",
-            (SIZE[0] - 130, 79),
-            (192, 150, 228),
-            self.small,
-        )
+        self.label(screen, f"POISON {level.mode.poison_potions.count}", (SIZE[0] - 118, 79), (192, 150, 228), self.small)
+        self.label(screen, f"RESUR. {level.mode.resurrection_potions.count}", (SIZE[0] - 118, 93), (150, 200, 228), self.small)
         if level.ghost:
             pygame.draw.rect(screen, (43, 48, 63), (70, 80, 80, 4))
             pygame.draw.rect(screen, (172, 136, 223), (70, 80, int(80 * level.mode.time_remaining / level.mode.duration), 4))
-        message = level.message if level.message_time > 0 else "P : poison / R : fiole de vie"
+        message = level.message if level.message_time > 0 else "P : devenir fantome / redevenir humain"
         for i, line in enumerate(textwrap.wrap(message, 60)):
             self.label(screen, line, (8, 92 + i * 11), WHITE, self.small)
         screen.blit(self.controls_surface, (8, SIZE[1] - 14))
@@ -189,14 +169,7 @@ class TrainingGame:
         veil.fill((6, 16, 22, 220))
         screen.blit(veil, (0, 0))
         self.label(screen, "COULOIR VALIDE", (SIZE[0] // 2 - 45, 55), GOLD, self.font)
-        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
-
-    def draw_loss(self, screen):
-        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
-        veil.fill((30, 8, 12, 220))
-        screen.blit(veil, (0, 0))
-        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, 55), (232, 120, 120), self.font)
-        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
+        self.label(screen, "R : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
 
 
 def main():
@@ -210,8 +183,7 @@ def main():
         window = pygame.display.set_mode(desktop_size, pygame.NOFRAME)
         pygame.display.set_caption("Couloir d'entrainement - Deadweight")
 
-        # Plein ecran fenetre : pas de changement de mode video, juste une fenetre
-        # sans bordure a la taille du bureau. Le rendu garde son ratio (letterbox).
+        # Plein ecran reel : pas de bandes noires, pas de lissage (rendu net).
         scale = min(desktop_size[0] / SIZE[0], desktop_size[1] / SIZE[1])
         scaled_size = (round(SIZE[0] * scale), round(SIZE[1] * scale))
         offset = ((desktop_size[0] - scaled_size[0]) // 2, (desktop_size[1] - scaled_size[1]) // 2)
@@ -238,7 +210,7 @@ def main():
             game.update(dt, direction)
             game.draw(canvas)
             window.fill((0, 0, 0))
-            window.blit(pygame.transform.smoothscale(canvas, scaled_size), offset)
+            window.blit(pygame.transform.scale(canvas, scaled_size), offset)
             pygame.display.flip()
             if "--smoke-test" in sys.argv:
                 running = False

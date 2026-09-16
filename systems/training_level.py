@@ -26,18 +26,16 @@ class TrainingLevel:
         self.spawn = self.data["spawn"]
         self.position = self.center(self.spawn)
         self.mode = GhostModeController(self.data["ghost_duration"])
+        self.keys_total = sum(row.count("K") for row in self.grid)
+        self.keys_collected = 0
+        self.collected_key_positions = set()
         self.won = False
-        self.lost = False
-        self.message = "P : poison / R : fiole de vie"
+        self.message = "P : devenez fantome pour traverser. P a nouveau pour redevenir humain."
         self.message_time = 6.0
 
     @property
     def ghost(self):
         return self.mode.state is PlayerState.GHOST
-
-    @property
-    def dead(self):
-        return self.mode.state is PlayerState.DEAD
 
     @property
     def vision(self):
@@ -60,6 +58,8 @@ class TrainingLevel:
             return False
         if tile == "Y":
             return ghost
+        if tile == "D":
+            return self.keys_collected >= self.keys_total
         return True
 
     def blocked(self, position):
@@ -74,29 +74,31 @@ class TrainingLevel:
         self.message, self.message_time = message, 6.0
 
     def action(self, key):
-        if self.won or self.lost:
+        if self.won:
             return
-        if key == pygame.K_p and not self.ghost:
+        if key != pygame.K_p:
+            return
+        if not self.ghost:
             if self.mode.enter_ghost_mode(self.position):
                 self.say("Votre corps reste ici. Traversez le mur dore.")
             else:
-                self.say("Plus de fioles de poison.")
-        elif key == pygame.K_r and self.ghost and self.mode.return_to_alive(self.position) is not None:
-            self.say("Vous ressuscitez avec une fiole de vie.")
-        elif key == pygame.K_r and self.ghost:
-            self.say("Plus de fioles de vie pour ressusciter.")
+                self.say("Plus de fioles de poison. R pour recommencer.")
+        elif self.mode.resurrection_potions.drink():
+            self.mode.return_to_alive()
+            self.say("Vous reprenez forme humaine, ici meme.")
+        else:
+            self.say("Plus de fioles de resurrection : attendez que le temps s'ecoule.")
 
     def update(self, dt, direction=(0, 0)):
-        if self.won or self.lost:
+        if self.won:
             return
         dt = max(0, dt)
         self.message_time = max(0, self.message_time - dt)
         restored = self.mode.update(dt)
-        if self.dead:
-            self.lost = True
-            self.say("Le temps est ecoule : vous etes mort. N pour recommencer.")
-        elif restored is not None:
-            self.position.update(restored)
+        if restored is not None:
+            # Ni le retour volontaire (P) ni l'expiration du temps ne doivent vous
+            # teleporter au cadavre : on redevient humain la ou l'on se trouve.
+            self.say("Le temps est ecoule. Vous reprenez forme humaine, ici meme.")
 
         direction = pygame.Vector2(direction)
         if direction.length_squared():
@@ -110,6 +112,12 @@ class TrainingLevel:
                 setattr(candidate, axis, getattr(candidate, axis) + getattr(step, axis))
                 if not self.blocked(candidate):
                     self.position.update(candidate)
+
+        cell = self.cell
+        if self.tile(*cell) == "K" and cell not in self.collected_key_positions:
+            self.collected_key_positions.add(cell)
+            self.keys_collected += 1
+            self.say(f"Cle trouvee ({self.keys_collected}/{self.keys_total}).")
 
         if not self.ghost and self.tile(*self.cell) == "E":
             self.won = True
