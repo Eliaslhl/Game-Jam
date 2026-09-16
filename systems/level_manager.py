@@ -1,6 +1,7 @@
-# Responsable : à assigner — construction du labyrinthe à partir d'un plan texte
+# Responsable : Thaïs — construction du labyrinthe à partir d'un plan texte
 
-import arcade
+import pygame
+
 from settings import TILE_SIZE, MUR, MUR_FISSURE, PORTE, CLE, FIOLE, LEVIER, SORTIE
 
 
@@ -8,12 +9,11 @@ def charger_labyrinthe(plan):
     """
     plan : liste de chaînes de caractères, une case = un caractère (voir constants.py).
     Retourne :
-      - maze_grid : dict {(x, y): caractère} pour tester les déplacements
-      - sprites_murs : SpriteList des murs à dessiner
+    - murs : liste de pygame.Rect à dessiner
       - objets : liste de (x, y, caractère) pour clés/fioles/leviers/porte/sortie
     """
     maze_grid = {}
-    sprites_murs = arcade.SpriteList()
+    murs = []
     objets = []
 
     hauteur = len(plan)
@@ -21,21 +21,14 @@ def charger_labyrinthe(plan):
         y = hauteur - 1 - row_index  # inverse la lecture : (0,0) en bas à gauche comme Arcade
         for x, caractere in enumerate(ligne):
             maze_grid[(x, y)] = caractere
-            px = x * TILE_SIZE + TILE_SIZE // 2
-            py = y * TILE_SIZE + TILE_SIZE // 2
-
             if caractere == MUR:
-                mur = arcade.SpriteSolidColor(TILE_SIZE, TILE_SIZE, arcade.color.DARK_GRAY)
-                mur.center_x, mur.center_y = px, py
-                sprites_murs.append(mur)
+                murs.append(pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
             elif caractere == MUR_FISSURE:
-                mur = arcade.SpriteSolidColor(TILE_SIZE, TILE_SIZE, arcade.color.GOLD)
-                mur.center_x, mur.center_y = px, py
-                sprites_murs.append(mur)
+                murs.append(pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
             elif caractere in (PORTE, CLE, FIOLE, LEVIER, SORTIE):
                 objets.append((x, y, caractere))
 
-    return maze_grid, sprites_murs, objets
+    return maze_grid, murs, objets
 
 
 # Plan d'exemple — à remplacer par vos propres labyrinthes.
