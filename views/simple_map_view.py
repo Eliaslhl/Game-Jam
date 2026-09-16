@@ -5,6 +5,8 @@ effets dynamiques (ames errantes, transformation) dans `effects.py`, et les
 petits utilitaires de rendu partages avec le couloir d'entrainement dans
 `pixel_effects.py`.
 """
+import os
+import sys
 import math
 import os
 from pathlib import Path
@@ -84,14 +86,19 @@ VISION_GHOST = 62
 
 
 class SimpleMapGame:
-    def __init__(self, scale=(1.0, 1.0), level=None):
+    def __init__(self, level=None):
+        # `level` en premier (et unique) positionnel : c'est ainsi que PuzzleGame
+        # (voir views/puzzle_view.py) appelle `super().__init__(PuzzleLevel())`.
         # Le decor (tuiles, sprites) reste en pixel-art brut, agrandi au nearest
         # neighbor par l'appelant : net et volontairement blocky. Le texte, lui,
-        # est rendu directement a la resolution finale de la fenetre (voir
-        # draw_text()) pour rester lisse, sans le flou d'un texte anticrenele
-        # agrandi apres coup ni le cote "pixelise" d'un texte sans anticrenelage.
-        self.scale_x, self.scale_y = scale
-        self.level = TrainingLevel(MAP_PATH)
+        # est mis en file (voir label()/present()) et rendu a la toute derniere
+        # etape, directement a la resolution finale de la fenetre, pour rester
+        # lisse sans le flou d'un texte anticrenele agrandi apres coup ni le
+        # cote "pixelise" d'un texte sans anticrenelage. `PuzzleGame` utilise
+        # deja ce meme principe (sa propre file `text_commands` + `present()`) ;
+        # cette classe de base s'y aligne pour que `self.label(...)` appele
+        # depuis une methode heritee (draw_map, draw_win, draw_loss, ...)
+        # atterrisse toujours dans la bonne file, celle de la sous-classe reelle.
         self.level = level if level is not None else TrainingLevel(MAP_PATH)
         self.tiles = PixelTiles(self.level, decorate=False)
         self.torches = compute_wall_torches(self.level)
@@ -109,11 +116,20 @@ class SimpleMapGame:
         self.dust_motes = generate_dust_motes(self.level, room_at)
 
         # Meme police que le menu principal (MedievalSharp) pour les titres, une
-        # variante plus lisible en petite taille pour le corps du HUD. Tailles
-        # calculees a la resolution finale (voir scale_x/scale_y ci-dessus).
-        self.font = pygame.font.Font(str(TITLE_FONT_FILE), max(1, round(13 * self.scale_y)))
-        self.small = pygame.font.Font(str(UI_FONT_FILE), max(1, round(11 * self.scale_y)))
-        self.tiny = pygame.font.Font(str(UI_FONT_FILE), max(1, round(9 * self.scale_y)))
+        # variante plus lisible en petite taille pour le corps du HUD. Ces
+        # polices sont a une taille de base fixe (repere du petit canevas) :
+        # elles servent a mesurer le texte (self.font.size(...)) et de cle pour
+        # choisir la bonne police a la resolution finale dans present().
+        self.font = pygame.font.Font(str(TITLE_FONT_FILE), 13)
+        self.small = pygame.font.Font(str(UI_FONT_FILE), 11)
+        self.tiny = pygame.font.Font(str(UI_FONT_FILE), 9)
+        self._text_commands = []
+        self._font_specs = {
+            id(self.font): (TITLE_FONT_FILE, 13),
+            id(self.small): (UI_FONT_FILE, 11),
+            id(self.tiny): (UI_FONT_FILE, 9),
+        }
+        self._scaled_fonts = {}
         self.yurei = YureiWalk()
         self.ghost_frames = [pygame.transform.scale(f, (13, 23)) for f in self.yurei.frames]
         self.soul_sprite = build_soul_sprite()
@@ -146,14 +162,8 @@ class SimpleMapGame:
         ]
         self.key_glow = make_glow(14, (235, 196, 90), 130)
 
-        # Rendus une seule fois, a la bonne taille finale : anticrenelage actif
-        # (True) puisqu'il n'y a plus de redimensionnement apres coup sur ce texte.
-        self.title_surface = self.font.render("LE SANCTUAIRE DES VEILLEURS", True, GOLD)
-        self.zone_labels = {
-            name: self.small.render(label, True, (139, 156, 163)) for name, label in ROOM_THEMES.items()
-        }
-        self.zone_labels[None] = self.small.render("Les Galeries", True, (139, 156, 163))
-        self.inventory_title = self.small.render("INVENTAIRE", True, GOLD)
+        self.zone_names = dict(ROOM_THEMES)
+        self.zone_names[None] = "Les Galeries"
 
     def current_room(self):
         p = self.level.position
@@ -165,10 +175,10 @@ class SimpleMapGame:
         self.camera.y = max(0, min(p.y - VIEW.h / 2, max(0, self.map_h - VIEW.h)))
 
     def label(self, screen, text, position, color=WHITE, font=None):
-        """Rendu direct sur `screen` (deja a la resolution finale) : position
-        donnee dans le repere du petit canevas pixel-art, mise a l'echelle ici."""
-        surface = (font or self.font).render(text, True, color)
-        screen.blit(surface, (position[0] * self.scale_x, position[1] * self.scale_y))
+        """Ne dessine rien tout de suite : met le texte en file, dans le repere
+        du petit canevas pixel-art. `present()` le rendra a la toute fin, a la
+        resolution finale de la fenetre (voir commentaire dans __init__)."""
+        self._text_commands.append((str(text), position, color, font or self.font, screen.get_clip()))
 
     def update(self, dt, direction):
         if self.map_open:
@@ -208,7 +218,7 @@ class SimpleMapGame:
         if key == pygame.K_m:
             self.map_open = not self.map_open
         elif key == pygame.K_n and (self.level.won or self.level.lost):
-            self.__init__(scale=(self.scale_x, self.scale_y))
+            self.__init__()
         elif not self.map_open:
             self.level.action(key)
 
@@ -413,32 +423,35 @@ class SimpleMapGame:
                 pygame.draw.circle(screen, (*BLOOD_COLOR, blood_alpha), (bx, by), max(1, round(size)))
 
     def draw_top_bar(self, screen):
-        """Fond + separateur uniquement : les textes sont dans draw_top_bar_text()."""
         pygame.draw.rect(screen, INK, (0, 0, PLAY_W, TOP_BAR_H))
         pygame.draw.line(screen, DIVIDER, (0, TOP_BAR_H - 1), (PLAY_W, TOP_BAR_H - 1))
-
-    def draw_top_bar_text(self, screen):
-        screen.blit(self.title_surface, (8 * self.scale_x, 3 * self.scale_y))
-        screen.blit(self.zone_labels[self.current_room()], (8 * self.scale_x, 19 * self.scale_y))
+        self.label(screen, "LE SANCTUAIRE DES VEILLEURS", (8, 3), GOLD, self.font)
+        self.label(screen, self.zone_names.get(self.current_room(), "Les Galeries"), (8, 19), (139, 156, 163), self.small)
 
     def draw_sidebar(self, screen):
-        """Fond, cadre et pictogrammes uniquement : les textes sont dans
-        draw_sidebar_text(). Les deux methodes partagent la meme disposition,
-        calculee une fois dans _sidebar_layout() pour rester synchronisees."""
         level = self.level
         pos = self._sidebar_layout()
+        x, w = pos["x"], pos["w"]
         pygame.draw.rect(screen, PANEL_BG, SIDEBAR)
         pygame.draw.line(screen, GOLD, (SIDEBAR.x, 0), (SIDEBAR.x, SIDEBAR.h), 1)
+        self.label(screen, "INVENTAIRE", (x, pos["title_y"]), GOLD, self.small)
 
-        pygame.draw.line(screen, DIVIDER, (pos["x"], pos["div1_y"]), (pos["x"] + pos["w"], pos["div1_y"]))
+        pygame.draw.line(screen, DIVIDER, (x, pos["div1_y"]), (x + w, pos["div1_y"]))
 
+        status = "AME ERRANTE" if level.ghost else "VIVANT"
         badge_bg = STATUS_GHOST_BG if level.ghost else STATUS_ALIVE_BG
         badge_fg = GHOST_STATUS if level.ghost else WHITE
+        bx, by, bw, bh = pos["badge"]
         pygame.draw.rect(screen, badge_bg, pos["badge"], border_radius=4)
         pygame.draw.rect(screen, badge_fg, pos["badge"], width=1, border_radius=4)
+        tw, th = self.small.size(status)
+        self.label(screen, status, (bx + (bw - tw) / 2, by + (bh - th) / 2), badge_fg, self.small)
 
-        self._draw_potion_icon(screen, pos["x"], pos["poison_y"], POTION_COUNT)
-        self._draw_potion_icon(screen, pos["x"], pos["resurrection_y"], RESURRECTION_COUNT)
+        self.label(screen, "FIOLES", (x, pos["fioles_label_y"]), TEXT_DIM, self.tiny)
+        self._draw_potion_row(screen, x, w, pos["poison_y"], POTION_COUNT, "Poison", level.mode.poison_potions.count)
+        self._draw_potion_row(
+            screen, x, w, pos["resurrection_y"], RESURRECTION_COUNT, "Resurrection", level.mode.resurrection_potions.count
+        )
 
         if pos["ghost_bar"] is not None:
             bar = pygame.Rect(*pos["ghost_bar"])
@@ -446,37 +459,11 @@ class SimpleMapGame:
             fill_w = max(0, int(bar.w * level.mode.time_remaining / level.mode.duration))
             if fill_w > 0:
                 pygame.draw.rect(screen, GHOST_BAR_FILL, (bar.x, bar.y, fill_w, bar.h), border_radius=2)
-
-        pygame.draw.line(screen, DIVIDER, (pos["x"], pos["div2_y"]), (pos["x"] + pos["w"], pos["div2_y"]))
-        self._draw_key_pips(screen, pos["x"], pos["keys_y"], level.keys_collected, level.keys_total)
-
-    def draw_sidebar_text(self, screen):
-        level = self.level
-        pos = self._sidebar_layout()
-        x, w = pos["x"], pos["w"]
-
-        screen.blit(self.inventory_title, (x * self.scale_x, pos["title_y"] * self.scale_y))
-
-        status = "AME ERRANTE" if level.ghost else "VIVANT"
-        badge_fg = GHOST_STATUS if level.ghost else WHITE
-        bx, by, bw, bh = pos["badge"]
-        status_surface = self.small.render(status, True, badge_fg)
-        rect = status_surface.get_rect(
-            center=((bx + bw / 2) * self.scale_x, (by + bh / 2) * self.scale_y)
-        )
-        screen.blit(status_surface, rect)
-
-        self.label(screen, "FIOLES", (x, pos["fioles_label_y"]), TEXT_DIM, self.tiny)
-        self._draw_potion_label(screen, x, w, pos["poison_y"], POTION_COUNT, "Poison", level.mode.poison_potions.count)
-        self._draw_potion_label(
-            screen, x, w, pos["resurrection_y"], RESURRECTION_COUNT, "Resurrection", level.mode.resurrection_potions.count
-        )
-
-        if pos["ghost_timer_y"] is not None:
             self.label(screen, f"Retour dans {level.mode.time_remaining:.1f}s", (x, pos["ghost_timer_y"]), GHOST_STATUS, self.tiny)
 
+        pygame.draw.line(screen, DIVIDER, (x, pos["div2_y"]), (x + w, pos["div2_y"]))
         self.label(screen, "OBJETS", (x, pos["objets_label_y"]), TEXT_DIM, self.tiny)
-        self._draw_key_pips_text(screen, x, pos["keys_y"], level.keys_collected, level.keys_total)
+        self._draw_key_pips(screen, x, pos["keys_y"], level.keys_collected, level.keys_total)
 
     def _sidebar_layout(self):
         """Positions (repere petit canevas) partagees par les formes et le texte
@@ -515,16 +502,13 @@ class SimpleMapGame:
         pos["keys_y"] = y
         return pos
 
-    def _draw_potion_icon(self, screen, x, y, color):
-        """La fiole (petit rectangle colore) seule ; le nom et le compte sont
-        dans _draw_potion_label()."""
+    def _draw_potion_row(self, screen, x, w, y, color, label, count):
         pygame.draw.rect(screen, color, (x, y + 1, 8, 10), border_radius=2)
         pygame.draw.rect(screen, INK, (x + 2, y, 4, 3))
-
-    def _draw_potion_label(self, screen, x, w, y, color, label, count):
         self.label(screen, label, (x + 14, y), WHITE, self.tiny)
-        count_surface = self.tiny.render(str(count), True, color)
-        screen.blit(count_surface, ((x + w) * self.scale_x - count_surface.get_width(), y * self.scale_y))
+        count_text = str(count)
+        tw, _ = self.tiny.size(count_text)
+        self.label(screen, count_text, (x + w - tw, y), color, self.tiny)
 
     def _key_pips_fit(self, total):
         pip, gap = 10, 4
@@ -532,29 +516,23 @@ class SimpleMapGame:
 
     def _draw_key_pips(self, screen, x, y, collected, total):
         """Une rangee de petits carres (une cle = un pion) : d'un coup d'oeil,
-        combien il en reste a trouver. Repli en texte si trop nombreuses (voir
-        _draw_key_pips_text pour le texte associe)."""
-        if not self._key_pips_fit(total):
-            return
-        pip, gap = 10, 4
-        for i in range(total):
-            px = x + i * (pip + gap)
-            rect = pygame.Rect(px, y, pip, pip)
-            if i < collected:
-                pygame.draw.rect(screen, (235, 196, 90), rect, border_radius=2)
-            else:
-                pygame.draw.rect(screen, TEXT_DIM, rect, width=1, border_radius=2)
-
-    def _draw_key_pips_text(self, screen, x, y, collected, total):
+        combien il en reste a trouver. Repli en texte si trop nombreuses."""
         if total <= 0:
             self.label(screen, "Aucune cle sur cette carte", (x, y), TEXT_DIM, self.tiny)
         elif self._key_pips_fit(total):
+            pip, gap = 10, 4
+            for i in range(total):
+                px = x + i * (pip + gap)
+                rect = pygame.Rect(px, y, pip, pip)
+                if i < collected:
+                    pygame.draw.rect(screen, (235, 196, 90), rect, border_radius=2)
+                else:
+                    pygame.draw.rect(screen, TEXT_DIM, rect, width=1, border_radius=2)
             self.label(screen, f"{collected}/{total}", (x, y + 14), (235, 196, 90), self.tiny)
         else:
             self.label(screen, f"Cles : {collected}/{total}", (x, y), (235, 196, 90), self.small)
 
     def draw_map(self, screen):
-        """Fond + carte miniature uniquement : le texte est dans draw_map_text()."""
         box = pygame.Rect(15, 15, SIZE[0] - 30, SIZE[1] - 30)
         veil = pygame.Surface(SIZE, pygame.SRCALPHA)
         veil.fill((6, 10, 16, 210))
@@ -571,16 +549,12 @@ class SimpleMapGame:
         cy = origin[1] + round(self.level.position.y * scale)
         pygame.draw.rect(screen, (230, 246, 232), (cx - 3, cy - 3, 6, 6), 1)
 
-    def draw_map_text(self, screen):
-        box = pygame.Rect(15, 15, SIZE[0] - 30, SIZE[1] - 30)
         self.label(screen, "CARTE (M pour fermer)", (box.x + 10, box.y + 6), GOLD, self.small)
 
     def draw_win(self, screen):
         veil = pygame.Surface(SIZE, pygame.SRCALPHA)
         veil.fill((6, 16, 22, 220))
         screen.blit(veil, (0, 0))
-
-    def draw_win_text(self, screen):
         self.label(screen, "SORTIE ATTEINTE", (SIZE[0] // 2 - 55, SIZE[1] // 2 - 10), GOLD, self.font)
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
 
@@ -588,34 +562,42 @@ class SimpleMapGame:
         veil = pygame.Surface(SIZE, pygame.SRCALPHA)
         veil.fill((30, 8, 12, 220))
         screen.blit(veil, (0, 0))
-
-    def draw_loss_text(self, screen):
         self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, SIZE[1] // 2 - 10), (232, 120, 120), self.font)
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
 
-    def draw_text(self, screen):
-        """Deuxieme passe : tout le texte du HUD, dessine directement a la
-        resolution finale de `screen` (net, ni flou ni pixelise), par-dessus le
-        petit canevas pixel-art deja agrandi et blitte dessus par l'appelant."""
-        level = self.level
-        self.draw_top_bar_text(screen)
-        self.draw_sidebar_text(screen)
-        if self.map_open:
-            self.draw_map_text(screen)
-        if level.won:
-            self.draw_win_text(screen)
-        elif level.lost:
-            self.draw_loss_text(screen)
+    def present(self, canvas, screen):
+        """Deuxieme passe : blitte le petit canevas pixel-art agrandi (net,
+        volontairement blocky), puis dessine par-dessus tout le texte du HUD
+        mis en file par label(), directement a la resolution finale de `screen`
+        (donc lisse, sans flou ni pixelisation). Meme principe que
+        `PuzzleGame.present()` dans views/puzzle_view.py."""
+        target_size = screen.get_size()
+        screen.blit(pygame.transform.scale(canvas, target_size), (0, 0))
+        sx = target_size[0] / SIZE[0]
+        sy = target_size[1] / SIZE[1]
+        for text, position, color, font, clip in self._text_commands:
+            path, base_size = self._font_specs.get(id(font), (UI_FONT_FILE, 11))
+            key = (path, base_size, sy)
+            scaled_font = self._scaled_fonts.get(key)
+            if scaled_font is None:
+                scaled_font = pygame.font.Font(str(path), max(1, round(base_size * sy)))
+                self._scaled_fonts[key] = scaled_font
+            if clip:
+                screen.set_clip(pygame.Rect(clip.x * sx, clip.y * sy, clip.w * sx, clip.h * sy))
+            else:
+                screen.set_clip(None)
+            surface = scaled_font.render(text, True, color)
+            screen.blit(surface, (position[0] * sx, position[1] * sy))
+        screen.set_clip(None)
+        self._text_commands.clear()
 
 
 def run(screen):
     """Boucle du sanctuaire dans une fenetre DEJA ouverte (ex : reprise de la
     fenetre du menu, meme taille). N'appelle ni pygame.init() ni pygame.quit() :
     c'est a l'appelant de gerer le cycle de vie de pygame."""
-    target_size = screen.get_size()
     canvas = pygame.Surface(SIZE)
-    scale = (target_size[0] / SIZE[0], target_size[1] / SIZE[1])
-    game = SimpleMapGame(scale=scale)
+    game = SimpleMapGame()
     clock = pygame.time.Clock()
     running = True
     while running:
@@ -635,8 +617,7 @@ def run(screen):
         )
         game.update(dt, direction)
         game.draw(canvas)
-        screen.blit(pygame.transform.scale(canvas, target_size), (0, 0))
-        game.draw_text(screen)
+        game.present(canvas, screen)
         pygame.display.flip()
         if "--smoke-test" in sys.argv:
             running = False
