@@ -11,8 +11,11 @@ from pathlib import Path
 import pygame
 
 from systems.ghost_mode import GhostModeController, PlayerState
+from systems.hazards import GhostHazards
 
 MAP_PATH = Path(__file__).resolve().parents[1] / "assets/maps/training_corridor.json"
+
+HOLE_COUNT = 4
 
 
 class TrainingLevel:
@@ -30,9 +33,21 @@ class TrainingLevel:
         self.keys_collected = 0
         self.collected_key_positions = set()
         self.won = False
+        self.holes = GhostHazards(self._floor_cells(), count=HOLE_COUNT)
+        self.message = "P : devenez fantome pour traverser. P a nouveau pour redevenir humain."
         self.lost = False
         self.message = "P : poison / R : resurrection / N : recommencer"
         self.message_time = 6.0
+
+    def _floor_cells(self):
+        """Cases de sol nu ('.') eligibles pour un trou, hors case de spawn."""
+        spawn_cell = tuple(self.spawn)
+        return [
+            (x, y)
+            for y in range(self.height)
+            for x in range(self.width)
+            if self.tile(x, y) == "." and (x, y) != spawn_cell
+        ]
 
     @property
     def ghost(self):
@@ -115,6 +130,11 @@ class TrainingLevel:
                 setattr(candidate, axis, getattr(candidate, axis) + getattr(step, axis))
                 if not self.blocked(candidate):
                     self.position.update(candidate)
+
+        if self.holes.is_lethal(self.cell):
+            self.dead = True
+            self.say("Un trou spectral vous a englouti.")
+            return
 
         cell = self.cell
         if self.tile(*cell) == "K" and cell not in self.collected_key_positions:

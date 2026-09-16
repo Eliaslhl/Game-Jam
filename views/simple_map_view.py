@@ -49,6 +49,9 @@ SIDEBAR = pygame.Rect(PLAY_W, 0, SIDEBAR_W, SIZE[1])
 GOLD = (224, 191, 119)
 INK = (12, 17, 25)
 WHITE = (222, 225, 216)
+HOLE_VOID = (18, 10, 28)
+HOLE_RIM = (172, 136, 223)
+GAME_OVER_RED = (196, 30, 30)
 
 VISION_ALIVE = 62
 VISION_GHOST = 62
@@ -179,6 +182,8 @@ class SimpleMapGame:
             self.draw_souls(screen)
 
         self.draw_special_tiles(screen, level)
+        if level.ghost:
+            self.draw_holes(screen, level)
 
         if level.mode.corpse_position is not None:
             cx, cy = self.point(level.mode.corpse_position)
@@ -251,6 +256,12 @@ class SimpleMapGame:
                 else:
                     pygame.draw.rect(screen, (30, 46, 36), rect.inflate(-4, -1))
                     pygame.draw.rect(screen, (140, 196, 150), rect.inflate(-4, -1), 1)
+
+    def draw_holes(self, screen, level):
+        for hx, hy in level.holes:
+            px, py = self.point(level.center((hx, hy)))
+            pygame.draw.circle(screen, HOLE_VOID, (px, py), 7)
+            pygame.draw.circle(screen, HOLE_RIM, (px, py), 7, 1)
 
     def draw_player(self, screen, level, px, py):
         pygame.draw.ellipse(screen, (12, 19, 27), (px - 6, py + 2, 12, 5))

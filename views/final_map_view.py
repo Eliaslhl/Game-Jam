@@ -15,6 +15,9 @@ VIEW=pygame.Rect(0,34,400,190)
 GOLD=(224,191,119)
 INK=(12,17,25)
 WHITE=(222,225,216)
+HOLE_VOID=(18,10,28)
+HOLE_RIM=(172,136,223)
+GAME_OVER_RED=(196,30,30)
 
 
 class FinalGame:
@@ -95,6 +98,10 @@ class FinalGame:
                 tile=level.tile(x,y)
                 px,py=self.point(level.center((x,y)))
                 rect=pygame.Rect(px-8,py-8,16,16)
+                if level.ghost and (x,y) in level.holes:
+                    # Invisible pour un vivant : ne se revele qu'en mode fantome.
+                    pygame.draw.circle(screen,HOLE_VOID,(px,py),7)
+                    pygame.draw.circle(screen,HOLE_RIM,(px,py),7,1)
                 if tile=='Y':
                     pygame.draw.rect(screen,(64,62,63),rect.inflate(-1,-1))
                     pygame.draw.rect(screen,(129,108,58),rect.inflate(-4,-2),1)
@@ -180,6 +187,7 @@ class FinalGame:
         if self.map_open: self.draw_map(screen)
         if self.help_open: self.draw_help(screen)
         if level.won: self.draw_win(screen)
+        elif level.dead: self.draw_dead(screen)
 
     def draw_hud(self,screen):
         level=self.level
@@ -257,6 +265,12 @@ class FinalGame:
         self.label(screen,'Vous avez retrouve les trois cles du labyrinthe.',(91,124),WHITE,self.small)
         self.label(screen,f'{int(self.level.time)//60} min {int(self.level.time)%60:02d} s   |   {len(self.level.discoveries)}/4 steles decouvertes',(110,143),(143,189,173))
         self.label(screen,'R : explorer a nouveau    Echap : quitter',(105,172),WHITE,self.small)
+
+    def draw_dead(self,screen):
+        veil=pygame.Surface(SIZE,pygame.SRCALPHA); veil.fill((26,4,4,220)); screen.blit(veil,(0,0))
+        self.label(screen,'ENGLOUTI PAR LE NEANT',(96,91),GAME_OVER_RED,self.title)
+        self.label(screen,'Un trou spectral n a laisse aucune trace de votre passage.',(78,124),WHITE,self.small)
+        self.label(screen,'R : recommencer    Echap : quitter',(120,172),WHITE,self.small)
 
 
 def main():

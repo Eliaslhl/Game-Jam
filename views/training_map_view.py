@@ -16,6 +16,9 @@ VIEW = pygame.Rect(0, 24, 320, 48)
 GOLD = (224, 191, 119)
 INK = (12, 17, 25)
 WHITE = (222, 225, 216)
+HOLE_VOID = (18, 10, 28)
+HOLE_RIM = (172, 136, 223)
+GAME_OVER_RED = (196, 30, 30)
 
 
 class TrainingGame:
@@ -107,6 +110,12 @@ class TrainingGame:
             elif tile == "E":
                 pygame.draw.rect(screen, (29, 55, 49), (px - 10, py - 14, 20, 25))
                 pygame.draw.rect(screen, (119, 232, 155), (px - 10, py - 14, 20, 25), 2, border_radius=8)
+        if level.ghost:
+            # Invisibles pour un vivant : ne se revelent qu'en mode fantome.
+            for hx, hy in level.holes:
+                hpx, hpy = self.point(level.center((hx, hy)))
+                pygame.draw.circle(screen, HOLE_VOID, (hpx, hpy), 7)
+                pygame.draw.circle(screen, HOLE_RIM, (hpx, hpy), 7, 1)
         if level.mode.corpse_position is not None:
             cx, cy = self.point(level.mode.corpse_position)
             pygame.draw.ellipse(screen, (118, 105, 109), (cx - 6, cy - 2, 12, 5))

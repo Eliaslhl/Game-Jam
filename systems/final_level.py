@@ -5,8 +5,11 @@ from pathlib import Path
 import pygame
 from systems.ghost_mode import GhostModeController, PlayerState
 from systems.interactions import can_interact
+from systems.hazards import GhostHazards
 
 MAP_PATH = Path(__file__).resolve().parents[1] / 'assets/maps/labyrinthe_des_ames_kadir.json'
+
+HOLE_COUNT = 6
 
 
 class FinalLevel:
@@ -23,12 +26,19 @@ class FinalLevel:
         self.explored = set()
         self.discoveries = set()
         self.won = False
+        self.dead = False
+        self.holes = GhostHazards(self._floor_cells(), count=HOLE_COUNT)
         self.time = 0.0
         self.deaths = 0
         self.hurt_cooldown = 0.0
         self.message = 'Les murs dores cachent des secrets. P pour devenir fantome.'
         self.message_time = 8.0
         self.reveal()
+
+    def _floor_cells(self):
+        """Cases de sol nu ('.') eligibles pour un trou, hors case de spawn."""
+        spawn_cell = tuple(self.data['spawn'])
+        return [cell for cell in self.cells('.') if cell != spawn_cell]
 
     @property
     def ghost(self):
@@ -72,7 +82,7 @@ class FinalLevel:
         self.message, self.message_time = message, 6.0
 
     def action(self, key):
-        if self.won:
+        if self.won or self.dead:
             return
         if key == pygame.K_p:
             if self.mode.enter_ghost_mode(self.position):
@@ -109,7 +119,7 @@ class FinalLevel:
                 return
 
     def update(self, dt, direction=(0, 0)):
-        if self.won:
+        if self.won or self.dead:
             return
         dt = max(0, dt)
         self.time += dt
@@ -130,6 +140,10 @@ class FinalLevel:
                 setattr(candidate, axis, getattr(candidate, axis) + getattr(step, axis))
                 if not self.blocked(candidate):
                     self.position.update(candidate)
+        if self.holes.is_lethal(self.cell):
+            self.dead = True
+            self.say('Un trou spectral vous a englouti.')
+            return
         if self.ghost:
             for cell in self.cells('abc'):
                 tile = self.tile(*cell)
