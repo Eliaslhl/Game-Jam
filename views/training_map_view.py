@@ -182,7 +182,48 @@ class TrainingGame:
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
 
 
+def run(screen):
+    """Boucle du couloir dans une fenetre DEJA ouverte (ex : reprise de la
+    fenetre du menu, meme taille). N'appelle ni pygame.init() ni pygame.quit() :
+    c'est a l'appelant de gerer le cycle de vie de pygame."""
+    target_size = screen.get_size()
+    # Le couloir garde ses proportions (pas de deformation) : on l'agrandit au
+    # maximum dans la fenetre, avec de fines bandes noires si besoin.
+    scale = min(target_size[0] / SIZE[0], target_size[1] / SIZE[1])
+    scaled_size = (round(SIZE[0] * scale), round(SIZE[1] * scale))
+    offset = ((target_size[0] - scaled_size[0]) // 2, (target_size[1] - scaled_size[1]) // 2)
+
+    canvas = pygame.Surface(SIZE)
+    game = TrainingGame()
+    clock = pygame.time.Clock()
+    running = True
+    while running:
+        dt = min(clock.tick(60) / 1000, 0.05)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                else:
+                    game.event(event.key)
+        keys = pygame.key.get_pressed()
+        direction = (
+            int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_q] or keys[pygame.K_LEFT]),
+            int(keys[pygame.K_s] or keys[pygame.K_DOWN]) - int(keys[pygame.K_w] or keys[pygame.K_z] or keys[pygame.K_UP]),
+        )
+        game.update(dt, direction)
+        game.draw(canvas)
+        screen.fill((0, 0, 0))
+        screen.blit(pygame.transform.scale(canvas, scaled_size), offset)
+        pygame.display.flip()
+        if "--smoke-test" in sys.argv:
+            running = False
+
+
 def main():
+    """Lancement autonome (python views/training_map_view.py) : plein ecran reel,
+    sans bandes noires, sans lissage (le rendu doit rester net, pas flou)."""
     if "--smoke-test" in sys.argv:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -192,38 +233,7 @@ def main():
         desktop_size = (desktop.current_w or 1280, desktop.current_h or 720)
         window = pygame.display.set_mode(desktop_size, pygame.NOFRAME)
         pygame.display.set_caption("Couloir d'entrainement - Deadweight")
-
-        # Plein ecran reel : pas de bandes noires, pas de lissage (rendu net).
-        scale = min(desktop_size[0] / SIZE[0], desktop_size[1] / SIZE[1])
-        scaled_size = (round(SIZE[0] * scale), round(SIZE[1] * scale))
-        offset = ((desktop_size[0] - scaled_size[0]) // 2, (desktop_size[1] - scaled_size[1]) // 2)
-
-        canvas = pygame.Surface(SIZE)
-        game = TrainingGame()
-        clock = pygame.time.Clock()
-        running = True
-        while running:
-            dt = min(clock.tick(60) / 1000, 0.05)
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
-                    else:
-                        game.event(event.key)
-            keys = pygame.key.get_pressed()
-            direction = (
-                int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_q] or keys[pygame.K_LEFT]),
-                int(keys[pygame.K_s] or keys[pygame.K_DOWN]) - int(keys[pygame.K_w] or keys[pygame.K_z] or keys[pygame.K_UP]),
-            )
-            game.update(dt, direction)
-            game.draw(canvas)
-            window.fill((0, 0, 0))
-            window.blit(pygame.transform.scale(canvas, scaled_size), offset)
-            pygame.display.flip()
-            if "--smoke-test" in sys.argv:
-                running = False
+        run(window)
     finally:
         pygame.quit()
 
