@@ -70,11 +70,6 @@ class SimpleMapGame:
         self.tiles_with_decor = self.tiles.surface.copy()
         self.tiles_with_decor.blit(self.decor_surface, (0, 0))
 
-        # Brouillard de guerre pour la carte (M) : seules les cases visitees sont
-        # reconstituees ; le reste reste noir tant qu'on n'y est pas passe.
-        self.explored = set()
-        self.revealed_surface = pygame.Surface(map_size)
-
         self.dust_motes = generate_dust_motes(self.level, room_at)
 
         self.font = pygame.font.Font(None, 18)
@@ -92,7 +87,6 @@ class SimpleMapGame:
         # consultable via M (draw_map), en net (pas de flou).
         self.camera = pygame.Vector2()
         self.update_camera()
-        self.reveal_around(self.level.position)
 
         self.elapsed = 0.0
         self.facing_left = False
@@ -125,15 +119,6 @@ class SimpleMapGame:
         self.camera.x = max(0, min(p.x - VIEW.w / 2, max(0, self.map_w - VIEW.w)))
         self.camera.y = max(0, min(p.y - VIEW.h / 2, max(0, self.map_h - VIEW.h)))
 
-    def reveal_around(self, position, radius_tiles=6):
-        cx, cy = int(position.x // 16), int(position.y // 16)
-        for y in range(max(0, cy - radius_tiles), min(self.level.height, cy + radius_tiles + 1)):
-            for x in range(max(0, cx - radius_tiles), min(self.level.width, cx + radius_tiles + 1)):
-                if (x, y) in self.explored or (x - cx) ** 2 + (y - cy) ** 2 > radius_tiles ** 2:
-                    continue
-                self.explored.add((x, y))
-                self.revealed_surface.blit(self.tiles_with_decor, (x * 16, y * 16), (x * 16, y * 16, 16, 16))
-
     def label(self, screen, text, position, color=WHITE, font=None):
         screen.blit((font or self.font).render(text, True, color), position)
 
@@ -147,7 +132,6 @@ class SimpleMapGame:
             self.facing_left = direction[0] < 0
         self.elapsed += dt
         self.update_camera()
-        self.reveal_around(self.level.position)
         for soul in self.souls:
             soul.update(dt)
 
@@ -376,7 +360,7 @@ class SimpleMapGame:
         pygame.draw.rect(screen, (100, 96, 77), box, 1)
 
         scale = min((box.w - 10) / self.map_w, (box.h - 10) / self.map_h)
-        scaled = pygame.transform.scale(self.revealed_surface, (round(self.map_w * scale), round(self.map_h * scale)))
+        scaled = pygame.transform.scale(self.tiles_with_decor, (round(self.map_w * scale), round(self.map_h * scale)))
         origin = (box.centerx - scaled.get_width() // 2, box.centery - scaled.get_height() // 2)
         screen.blit(scaled, origin)
 
