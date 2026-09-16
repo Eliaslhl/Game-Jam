@@ -30,12 +30,17 @@ class TrainingLevel:
         self.keys_collected = 0
         self.collected_key_positions = set()
         self.won = False
-        self.message = "P : devenez fantome pour traverser. P a nouveau pour redevenir humain."
+        self.lost = False
+        self.message = "P : poison / R : resurrection / N : recommencer"
         self.message_time = 6.0
 
     @property
     def ghost(self):
         return self.mode.state is PlayerState.GHOST
+
+    @property
+    def dead(self):
+        return self.mode.state is PlayerState.DEAD
 
     @property
     def vision(self):
@@ -74,31 +79,29 @@ class TrainingLevel:
         self.message, self.message_time = message, 6.0
 
     def action(self, key):
-        if self.won:
+        if self.won or self.lost:
             return
-        if key != pygame.K_p:
-            return
-        if not self.ghost:
+        if key == pygame.K_p and not self.ghost:
             if self.mode.enter_ghost_mode(self.position):
                 self.say("Votre corps reste ici. Traversez le mur dore.")
             else:
-                self.say("Plus de fioles de poison. R pour recommencer.")
-        elif self.mode.resurrection_potions.drink():
-            self.mode.return_to_alive()
-            self.say("Vous reprenez forme humaine, ici meme.")
-        else:
-            self.say("Plus de fioles de resurrection : attendez que le temps s'ecoule.")
+                self.say("Plus de fioles de poison.")
+        elif key == pygame.K_r and self.ghost:
+            if self.mode.return_to_alive(self.position) is not None:
+                self.say("Vous ressuscitez a votre position actuelle.")
+            else:
+                self.say("Plus de fioles de resurrection.")
 
     def update(self, dt, direction=(0, 0)):
-        if self.won:
+        if self.won or self.lost:
             return
         dt = max(0, dt)
         self.message_time = max(0, self.message_time - dt)
         restored = self.mode.update(dt)
-        if restored is not None:
-            # Ni le retour volontaire (P) ni l'expiration du temps ne doivent vous
-            # teleporter au cadavre : on redevient humain la ou l'on se trouve.
-            self.say("Le temps est ecoule. Vous reprenez forme humaine, ici meme.")
+        if self.dead:
+            self.lost = True
+            self.say("Le temps est ecoule : vous etes mort. N pour recommencer.")
+            return
 
         direction = pygame.Vector2(direction)
         if direction.length_squared():

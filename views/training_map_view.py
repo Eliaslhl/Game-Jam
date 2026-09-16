@@ -49,7 +49,7 @@ class TrainingGame:
         # Textes qui ne changent jamais : rendus une seule fois plutot qu'a chaque frame.
         self.title_surface = self.font.render("COULOIR D'ENTRAINEMENT", True, GOLD)
         self.controls_surface = self.small.render(
-            "ZQSD / fleches : bouger   P : potion   R : recommencer", True, (136, 149, 157)
+            "ZQSD / fleches : bouger   P : poison   R : vie   N : recommencer", True, (136, 149, 157)
         )
 
     def _add_bottom_wall_torches(self):
@@ -74,7 +74,7 @@ class TrainingGame:
         self.elapsed += dt
 
     def event(self, key):
-        if key == pygame.K_r:
+        if key == pygame.K_n and (self.level.won or self.level.lost):
             self.__init__()
         else:
             self.level.action(key)
@@ -122,7 +122,8 @@ class TrainingGame:
             frame = self.tiles.art["player"]
             if self.facing_left:
                 frame = pygame.transform.flip(frame, True, False)
-            screen.blit(frame, (px - 5, py - 8 - (int(self.elapsed * 8) % 2 if self.moving else 0)))
+            bob = int(self.elapsed * 8) % 2 if self.moving else 0
+            screen.blit(frame, (px - frame.get_width() // 2, py - frame.get_height() + 4 - bob))
 
         torch_points = [(wx, self.point((wx, wy))) for wx, wy in self.tiles.torches]
 
@@ -143,6 +144,8 @@ class TrainingGame:
         self.draw_hud(screen)
         if level.won:
             self.draw_win(screen)
+        elif level.lost:
+            self.draw_loss(screen)
 
     def draw_hud(self, screen):
         level = self.level
@@ -159,7 +162,7 @@ class TrainingGame:
         if level.ghost:
             pygame.draw.rect(screen, (43, 48, 63), (70, 80, 80, 4))
             pygame.draw.rect(screen, (172, 136, 223), (70, 80, int(80 * level.mode.time_remaining / level.mode.duration), 4))
-        message = level.message if level.message_time > 0 else "P : devenir fantome / redevenir humain"
+        message = level.message if level.message_time > 0 else "P : poison / R : resurrection / N : recommencer"
         for i, line in enumerate(textwrap.wrap(message, 60)):
             self.label(screen, line, (8, 92 + i * 11), WHITE, self.small)
         screen.blit(self.controls_surface, (8, SIZE[1] - 14))
@@ -169,7 +172,14 @@ class TrainingGame:
         veil.fill((6, 16, 22, 220))
         screen.blit(veil, (0, 0))
         self.label(screen, "COULOIR VALIDE", (SIZE[0] // 2 - 45, 55), GOLD, self.font)
-        self.label(screen, "R : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
+        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
+
+    def draw_loss(self, screen):
+        veil = pygame.Surface(SIZE, pygame.SRCALPHA)
+        veil.fill((30, 8, 12, 220))
+        screen.blit(veil, (0, 0))
+        self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, 55), (232, 120, 120), self.font)
+        self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 85, 75), WHITE, self.small)
 
 
 def main():
