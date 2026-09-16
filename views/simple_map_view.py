@@ -1,11 +1,10 @@
-"""Vue du Sanctuaire des Veilleurs : boucle de jeu, camera, HUD et rendu.
+"""Moteur du Sanctuaire des Veilleurs : camera, HUD et rendu (classe `SimpleMapGame`,
+reprise par `views/puzzle_view.py` pour la partie jouable avec les enigmes).
 Le decor statique (fontaines, salles thematiques) vit dans `map_theme.py`, les
 effets dynamiques (ames errantes, transformation) dans `effects.py`, et les
 petits utilitaires de rendu partages avec le couloir d'entrainement dans
 `pixel_effects.py`.
 """
-import os
-import sys
 import math
 from pathlib import Path
 
@@ -415,56 +414,3 @@ class SimpleMapGame:
         screen.blit(veil, (0, 0))
         self.label(screen, "VOUS ETES MORT", (SIZE[0] // 2 - 48, SIZE[1] // 2 - 10), (232, 120, 120), self.font)
         self.label(screen, "N : recommencer    Echap : quitter", (SIZE[0] // 2 - 90, SIZE[1] // 2 + 10), WHITE, self.small)
-
-
-def run(screen):
-    """Boucle du sanctuaire dans une fenetre DEJA ouverte (ex : reprise de la
-    fenetre du menu, meme taille). N'appelle ni pygame.init() ni pygame.quit() :
-    c'est a l'appelant de gerer le cycle de vie de pygame."""
-    target_size = screen.get_size()
-    canvas = pygame.Surface(SIZE)
-    game = SimpleMapGame()
-    clock = pygame.time.Clock()
-    running = True
-    while running:
-        dt = min(clock.tick(60) / 1000, 0.05)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                else:
-                    game.event(event.key)
-        keys = pygame.key.get_pressed()
-        direction = (
-            int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_q] or keys[pygame.K_LEFT]),
-            int(keys[pygame.K_s] or keys[pygame.K_DOWN]) - int(keys[pygame.K_w] or keys[pygame.K_z] or keys[pygame.K_UP]),
-        )
-        game.update(dt, direction)
-        game.draw(canvas)
-        screen.blit(pygame.transform.scale(canvas, target_size), (0, 0))
-        pygame.display.flip()
-        if "--smoke-test" in sys.argv:
-            running = False
-
-
-def main():
-    """Lancement autonome (python views/simple_map_view.py) : plein ecran reel,
-    sans bandes noires, sans lissage (le rendu doit rester net, pas flou)."""
-    if "--smoke-test" in sys.argv:
-        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-        os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-    pygame.init()
-    try:
-        desktop = pygame.display.Info()
-        desktop_size = (desktop.current_w or 1280, desktop.current_h or 720)
-        window = pygame.display.set_mode(desktop_size, pygame.NOFRAME)
-        pygame.display.set_caption("Le sanctuaire - Deadweight")
-        run(window)
-    finally:
-        pygame.quit()
-
-
-if __name__ == "__main__":
-    main()

@@ -23,10 +23,8 @@ class PuzzleGame(SimpleMapGame):
         self.text_commands.append((str(text),position,color,font or self.font,screen.get_clip().copy()))
 
     def present(self,canvas,window):
-        scale=min(window.get_width()/SIZE[0],window.get_height()/SIZE[1])
-        size=(round(SIZE[0]*scale),round(SIZE[1]*scale))
-        origin=((window.get_width()-size[0])//2,(window.get_height()-size[1])//2)
-        window.fill(INK)
+        size=(window.get_width(),window.get_height())
+        origin=(0,0)
         window.blit(pygame.transform.scale(canvas,size),origin)
         sx,sy=size[0]/SIZE[0],size[1]/SIZE[1]
         for text,pos,color,font,clip in self.text_commands:
@@ -199,8 +197,6 @@ class PuzzleGame(SimpleMapGame):
                (f'Resurrection : {level.mode.resurrection_potions.count}',(150,200,228)),
                (f'Recharge : {level.cooldown:.1f}s' if level.cooldown else 'Poison pret',WHITE),
                (f'Cles : {len(level.keys)}/3',GOLD)]
-        for key in ('blue','red','green'):
-            lines.append((f"{dict(blue='Bleue',red='Rouge',green='Verte')[key]} : "+('oui' if key in level.keys else '-'),COLORS[key]))
         for i,(text,color) in enumerate(lines):self.label(screen,text,(x,14+i*16),color,self.small)
         message=level.message if level.message_time>0 else 'Chapelle : statues. Jardin : chemin. Bibliotheque : leviers.'
         for i,line in enumerate(textwrap.wrap(message,23)[:6]):
