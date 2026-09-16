@@ -1,3 +1,6 @@
+import os
+import sys
+
 import pygame
 
 from settings import (
@@ -14,11 +17,11 @@ from settings import (
     TEXT_DIM,
 )
 from views import training_map_view
+from views import simple_map_view
 
 MENU_ITEMS = [
     ("Jouer", "play"),
     ("Tutoriel", "tutorial"),
-    ("Règles", "rules"),
     ("Quitter", "quit"),
 ]
 
@@ -103,6 +106,15 @@ def _new_window() -> pygame.Surface:
     return screen
 
 
+def _fullscreen_window() -> pygame.Surface:
+    """Fenetre plein ecran reel (sans bandes du bureau), pour la partie et le
+    tutoriel uniquement : le menu, lui, reste dans sa fenetre normale."""
+    desktop = pygame.display.Info()
+    desktop_size = (desktop.current_w or SCREEN_WIDTH, desktop.current_h or SCREEN_HEIGHT)
+    screen = pygame.display.set_mode(desktop_size, pygame.FULLSCREEN)
+    return screen
+
+
 def run(screen: pygame.Surface) -> None:
     clock = pygame.time.Clock()
     scene = MenuScene(screen)
@@ -115,22 +127,30 @@ def run(screen: pygame.Surface) -> None:
 
             action = scene.handle_event(event)
             if action == "play":
-                print("Zaizai")
-            elif action == "tutorial":
-                training_map_view.main()
-                pygame.init()
+                # Plein ecran pour la partie, puis retour a la fenetre du menu.
+                fullscreen = _fullscreen_window()
+                simple_map_view.run(fullscreen)
                 screen = _new_window()
                 scene = MenuScene(screen)
-            elif action == "rules":
-                print("Zonzon")
+            elif action == "tutorial":
+                # Plein ecran pour le tutoriel, puis retour a la fenetre du menu.
+                fullscreen = _fullscreen_window()
+                training_map_view.run(fullscreen)
+                screen = _new_window()
+                scene = MenuScene(screen)
             elif action == "quit":
                 return
 
         scene.draw()
         pygame.display.flip()
+        if "--smoke-test" in sys.argv:
+            return
 
 
 def main() -> None:
+    if "--smoke-test" in sys.argv:
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     pygame.init()
     screen = _new_window()
     run(screen)

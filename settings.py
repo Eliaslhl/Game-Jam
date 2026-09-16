@@ -5,8 +5,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 FONTS_DIR = PROJECT_ROOT / "assets" / "fonts"
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 720
 SCREEN_TITLE = "Witch or Ghost"
 
 TILE_SIZE = 64
