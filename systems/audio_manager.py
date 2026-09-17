@@ -85,6 +85,8 @@ class SanctuaryAudio:
             # Geography determines atmosphere, so music cannot reveal gold.
             room = level.special_room
         if room != self.room:
+            if room is not None and 'step' in self.sounds:
+                self.sounds['step'].stop()
             self.room = room
             self.sequence = 0
             self.active_bed = 1-self.active_bed
@@ -117,8 +119,8 @@ class SanctuaryAudio:
             self.next_beat = self.clock+1.0-.55*danger
         elif not level.ghost:
             self.channels[3].stop()
-        if moving and not level.ghost and self.clock >= self.next_step:
-            self.play('step', .13)
+        if moving and room is None and not level.ghost and self.clock >= self.next_step:
+            self.play('step', .04)
             self.next_step = self.clock+.34
 
     def stop(self):
