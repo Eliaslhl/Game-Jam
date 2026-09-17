@@ -36,9 +36,10 @@ class TrainingLevel:
         # hole_count=0 desactive les pieges (ex : le couloir d'entrainement, ou
         # on ne veut pas surprendre le joueur avant la vraie partie).
         self.holes = GhostHazards(self._floor_cells(), count=HOLE_COUNT if hole_count is None else hole_count)
-        self.message = "P : devenez fantome pour traverser. P a nouveau pour redevenir humain."
         self.lost = False
-        self.message = "P : poison / R : resurrection / N : recommencer"
+        # Memes touches que la vraie partie : le tutoriel ne doit pas enseigner
+        # des reflexes qui trahissent ensuite (voir action()).
+        self.message = "P : devenez fantome pour traverser. P ou Entree pour revenir au corps."
         self.message_time = 6.0
 
     def _is_pinch_point(self, x, y):
@@ -111,16 +112,20 @@ class TrainingLevel:
     def action(self, key):
         if self.won or self.lost:
             return
-        if key == pygame.K_p and not self.ghost:
-            if self.mode.enter_ghost_mode(self.position):
-                self.say("Votre corps reste ici. Traversez le mur dore.")
-            else:
-                self.say("Plus de fioles de poison.")
-        elif key == pygame.K_r and self.ghost:
+        # Exactement les memes touches que la partie (PuzzleLevel.action) : P ou
+        # Entree fait l'aller-retour vivant/fantome. R n'est PAS la resurrection
+        # ici, c'est le redemarrage comme en jeu - l'inverse s'apprenait dans le
+        # tutoriel et faisait perdre sa partie au joueur d'un seul appui.
+        if key in (pygame.K_p, pygame.K_RETURN) and self.ghost:
             if self.mode.return_to_alive(self.position) is not None:
                 self.say("Vous ressuscitez a votre position actuelle.")
             else:
                 self.say("Plus de fioles de resurrection.")
+        elif key == pygame.K_p:
+            if self.mode.enter_ghost_mode(self.position):
+                self.say("Votre corps reste ici. Traversez le mur dore.")
+            else:
+                self.say("Plus de fioles de poison.")
 
     def update(self, dt, direction=(0, 0)):
         if self.won or self.lost:
@@ -162,4 +167,6 @@ class TrainingLevel:
             self.won = True
             self.say("Sortie atteinte : le couloir est valide.")
         elif self.ghost and self.tile(*self.cell) == "E":
-            self.say("Une ame ne peut pas franchir le seuil : redevenez humain (P).")
+            # Meme vocabulaire que la partie ("fantome", "vivant") et memes
+            # touches de retour, pour ne rien enseigner qui change ensuite.
+            self.say("Un fantome ne peut pas franchir le seuil : redevenez vivant (P ou Entree).")

@@ -92,9 +92,14 @@ class TrainingGame:
         # Textes qui ne changent jamais : rendus une seule fois plutot qu'a chaque
         # frame, deja a la taille finale donc anticrenelage actif (net, sans flou).
         self.title_surface = self.font.render("COULOIR D'ENTRAINEMENT", True, GOLD)
-        self.controls_surface = self.small.render(
-            "ZQSD / fleches : bouger", True, (136, 149, 157)
-        )
+        # Les memes touches que la partie, annoncees avec les memes mots : le
+        # tutoriel sert a les apprendre, elles ne doivent pas differer d'un
+        # mode a l'autre. Deux lignes car tout ne tient pas sur la largeur.
+        self.controls_surfaces = [
+            self.small.render(line, True, (136, 149, 157))
+            for line in ("ZQSD / fleches : bouger   P ou Entree : fantome / retour",
+                         "R : recommencer   Echap : quitter")
+        ]
 
     def _add_bottom_wall_torches(self):
         """PixelTiles ne met des torches que sur le mur du haut : on symetrise en bas."""
@@ -150,7 +155,9 @@ class TrainingGame:
         self.end_sound_state = state
 
     def event(self, key):
-        if key == pygame.K_n and (self.level.won or self.level.lost):
+        # R et N relancent a tout moment, comme en partie (PuzzleGame.event) :
+        # dans le tutoriel, R ressuscitait, ce qui apprenait l'inverse du jeu.
+        if key in (pygame.K_r, pygame.K_n):
             if pygame.mixer.get_init():
                 pygame.mixer.music.unpause()
             self.__init__(scale=self.scale, offset=self.offset)
@@ -272,16 +279,20 @@ class TrainingGame:
         if level.dead or level.lost:
             status, status_color = "MORT", DEAD_STATUS
         elif level.ghost:
-            status, status_color = "AME ERRANTE", GHOST_STATUS
+            # "FANTOME" comme en partie (PuzzleGame.draw_sidebar) : le tutoriel
+            # sert a apprendre le jeu, pas un autre vocabulaire.
+            status, status_color = "FANTOME", GHOST_STATUS
         else:
             status, status_color = "VIVANT", WHITE
         self.label(screen, status, (8, 79), status_color, self.small)
         self.label(screen, f"POISON {level.mode.poison_potions.count}", (SIZE[0] - 118, 79), POTION_COUNT, self.small)
         self.label(screen, f"RESUR. {level.mode.resurrection_potions.count}", (SIZE[0] - 118, 93), RESURRECTION_COUNT, self.small)
-        message = level.message if level.message_time > 0 else "P : poison / R : resurrection / N : recommencer"
+        message = level.message if level.message_time > 0 else "P ou Entree : fantome / retour. R : recommencer."
         for i, line in enumerate(textwrap.wrap(message, 38)):
             self.label(screen, line, (8, 92 + i * 11), WHITE, self.small)
-        screen.blit(self.controls_surface, (8 * self.scale + self.offset[0], (SIZE[1] - 14) * self.scale + self.offset[1]))
+        for i, surface in enumerate(self.controls_surfaces):
+            y = (SIZE[1] - 25 + i * 11) * self.scale + self.offset[1]
+            screen.blit(surface, (8 * self.scale + self.offset[0], y))
 
     def draw_win_text(self, screen):
         self.label(screen, "COULOIR VALIDE", (SIZE[0] // 2 - 45, 55), GOLD, self.font)
