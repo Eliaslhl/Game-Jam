@@ -55,7 +55,10 @@ from settings import (
     GHOST_BAR_FILL,
     POTION_COUNT,
     BACKGROUND_MUSIC,
-    BACKGROUND_MUSIC_VOLUME
+    BACKGROUND_MUSIC_VOLUME,
+    VICTORY_SOUND,
+    DEFEAT_SOUND,
+    END_SOUND_VOLUME,
 )
 
 MAPS_DIR = Path(__file__).resolve().parents[1] / "assets/maps"
@@ -141,6 +144,8 @@ class SimpleMapGame:
         self.souls = make_souls()
         self.transform_effect = None
         self.was_ghost = False
+        self.end_sounds = self._load_end_sounds()
+        self.end_sound_state = None
 
         self.map_w, self.map_h = map_size
         # La salle est plus grande que l'ecran de jeu : camera qui suit le joueur,
@@ -168,6 +173,28 @@ class SimpleMapGame:
 
         self.zone_names = dict(ROOM_THEMES)
         self.zone_names[None] = "Les Galeries"
+
+    @staticmethod
+    def _load_end_sounds():
+        if not pygame.mixer.get_init():
+            return {}
+        sounds = {}
+        for state, path in (("win", VICTORY_SOUND), ("loss", DEFEAT_SOUND)):
+            try:
+                sound = pygame.mixer.Sound(str(path))
+                sound.set_volume(END_SOUND_VOLUME)
+                sounds[state] = sound
+            except (pygame.error, OSError) as error:
+                print(f"Son de fin indisponible ({path.name}) : {error}")
+        return sounds
+
+    def _play_end_sound_if_needed(self):
+        state = "loss" if self.level.lost else "win" if self.level.won else None
+        if state == self.end_sound_state:
+            return
+        if state in self.end_sounds:
+            self.end_sounds[state].play()
+        self.end_sound_state = state
 
     def current_room(self):
         p = self.level.position
@@ -200,6 +227,7 @@ class SimpleMapGame:
             return
         old = self.level.position.copy()
         self.level.update(dt, direction)
+        self._play_end_sound_if_needed()
         self.moving = old.distance_to(self.level.position) > 0.01
         if direction[0]:
             self.facing_left = direction[0] < 0

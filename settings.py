@@ -8,6 +8,9 @@ SOUNDS_DIR = PROJECT_ROOT / "assets" / "sounds"
 IMAGES_DIR = PROJECT_ROOT / "assets" / "images"
 BACKGROUND_MUSIC = SOUNDS_DIR / "music_fond.wav"
 BACKGROUND_MUSIC_VOLUME = 0.35
+VICTORY_SOUND = SOUNDS_DIR / "son_victoire.wav"
+DEFEAT_SOUND = SOUNDS_DIR / "son_perdu.wav"
+END_SOUND_VOLUME = 0.8
 
 # Logo rond du jeu, affiche a la place du titre dans le menu principal.
 LOGO_FILE = IMAGES_DIR / "logo.jpeg"

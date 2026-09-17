@@ -18,6 +18,8 @@ from views.pixel_effects import (
     make_glow,
 )
 from settings import (
+    DEFEAT_SOUND,
+    END_SOUND_VOLUME,
     TITLE_FONT_FILE,
     UI_FONT_FILE,
     TEXT_DIM,
@@ -26,6 +28,7 @@ from settings import (
     GHOST_BAR_BG,
     GHOST_BAR_FILL,
     POTION_COUNT,
+    VICTORY_SOUND,
 )
 from views.effects import build_corpse_sprite
 
@@ -71,6 +74,8 @@ class TrainingGame:
         self.moving = False
         self.danger_intensity = 0.0
         self.shake_offset = (0.0, 0.0)
+        self.end_sounds = self._load_end_sounds()
+        self.end_sound_state = None
         self.shade = pygame.Surface(VIEW.size, pygame.SRCALPHA)
         self.lights = {}
 
@@ -110,6 +115,7 @@ class TrainingGame:
     def update(self, dt, direction):
         old = self.level.position.copy()
         self.level.update(dt, direction)
+        self._play_end_sound_if_needed()
         self.moving = old.distance_to(self.level.position) > 0.01
         if direction[0]:
             self.facing_left = direction[0] < 0
@@ -120,6 +126,28 @@ class TrainingGame:
             ghost_danger_intensity(mode.time_remaining, mode.duration) if self.level.ghost else 0.0
         )
         self.shake_offset = danger_shake(self.elapsed, self.danger_intensity)
+
+    @staticmethod
+    def _load_end_sounds():
+        if not pygame.mixer.get_init():
+            return {}
+        sounds = {}
+        for state, path in (("win", VICTORY_SOUND), ("loss", DEFEAT_SOUND)):
+            try:
+                sound = pygame.mixer.Sound(str(path))
+                sound.set_volume(END_SOUND_VOLUME)
+                sounds[state] = sound
+            except (pygame.error, OSError) as error:
+                print(f"Son de fin indisponible ({path.name}) : {error}")
+        return sounds
+
+    def _play_end_sound_if_needed(self):
+        state = "loss" if self.level.lost else "win" if self.level.won else None
+        if state == self.end_sound_state:
+            return
+        if state in self.end_sounds:
+            self.end_sounds[state].play()
+        self.end_sound_state = state
 
     def event(self, key):
         if key == pygame.K_n and (self.level.won or self.level.lost):
