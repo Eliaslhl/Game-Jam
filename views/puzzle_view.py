@@ -4,8 +4,11 @@ import os
 import sys
 import pygame
 from systems.puzzle_level import PuzzleLevel
+from systems.audio_manager import SanctuaryAudio
 from views.pixel_effects import DANGER_COLOR, lerp_color
 from views.sanctuary_feedback import SanctuaryFeedback
+from views.room_atmosphere import RoomAtmosphere, THEMES
+from views.sanctuary_victory import SanctuaryVictory
 from views.simple_map_view import (
     SimpleMapGame,
     SIZE,
@@ -44,8 +47,11 @@ class PuzzleGame(SimpleMapGame):
     def __init__(self):
         super().__init__(PuzzleLevel())
         self.special_tiles = [t for t in self.special_tiles if t[2] != 'D']
-        self.feedback_fx = SanctuaryFeedback()
+        self.feedback_fx = SanctuaryFeedback(sound_enabled=False)
+        self.audio = SanctuaryAudio()
+        self.atmosphere = RoomAtmosphere(self.level)
         self.music_paused = False
+        self.victory_scene = SanctuaryVictory()
         # Le texte passe par la file `_text_commands` et le present() de
         # SimpleMapGame (voir views/simple_map_view.py) : meme police que le
         # menu (MedievalSharp) et meme rendu net, plutot qu'une police par
@@ -53,16 +59,21 @@ class PuzzleGame(SimpleMapGame):
 
     def drain_events(self):
         while self.level.events:
-            self.feedback_fx.emit(self.level.events.pop(0))
+            event = self.level.events.pop(0)
+            self.feedback_fx.emit(event)
+            self.audio.emit(event, self.level.position)
 
     def update(self,dt,direction):
         if self.map_open:
+            self.audio.update(dt, self.level, paused=True)
             return
+        self.audio.set_paused(False)
         self.drain_events()
         simulation_dt=self.feedback_fx.advance(dt)
         super().update(simulation_dt,direction)
         self.drain_events()
-        silent = self.level.trial_room is not None or self.level.special_room is not None
+        self.audio.update(dt, self.level, self.moving)
+        silent = self.level.won or self.level.lost or self.level.trial_room is not None or self.level.special_room is not None
         if pygame.mixer.get_init() and silent != self.music_paused:
             if silent: pygame.mixer.music.pause()
             else: pygame.mixer.music.unpause()
@@ -73,6 +84,9 @@ class PuzzleGame(SimpleMapGame):
 
     def event(self,key):
         if key in (pygame.K_r, pygame.K_n):
+            self.audio.stop()
+            for sound in self.end_sounds.values():
+                sound.stop()
             if pygame.mixer.get_init(): pygame.mixer.music.unpause()
             self.__init__()
             return
@@ -82,6 +96,7 @@ class PuzzleGame(SimpleMapGame):
 
     def draw_lighting(self,screen,torch_points,px,py,is_ghost):
         super().draw_lighting(screen,torch_points,px,py,is_ghost)
+        self.atmosphere.draw_air(screen,self)
         self.feedback_fx.draw(screen,self)
         if is_ghost:
             aura=pygame.Surface(screen.get_size(),pygame.SRCALPHA)
@@ -120,6 +135,8 @@ class PuzzleGame(SimpleMapGame):
                     screen.blit(frame,frame.get_rect(center=(round(pos.x),round(pos.y))))
 
     def draw_special_tiles(self,screen,level):
+        self.atmosphere.draw_floor(screen,self)
+        self.atmosphere.draw_creatures(screen,self)
         super().draw_special_tiles(screen,level)
         for obj in sorted(level.objects,key=lambda o: -1 if o.type=='plateau' else (0 if o.type=='chest' else (2 if o.type=='key' else 1))):
             if not obj.visible_to(level): continue
@@ -200,10 +217,25 @@ class PuzzleGame(SimpleMapGame):
                 pygame.draw.rect(screen,(112,94,66),(x-5,y-5,10,8))
                 self.label(screen,'?',(x,y-1),WHITE,self.small,align="center",valign="middle")
             elif obj.type=='order_statue':
-                pygame.draw.ellipse(screen,(35,40,48),(x-7,y+3,14,5))
-                pygame.draw.rect(screen,(120,110,150),(x-5,y-5,10,11))
-                pygame.draw.circle(screen,(196,186,216),(x,y-9),5)
-                pygame.draw.line(screen,GOLD,(x-3,y-10),(x+3,y-10),2)
+                puzzle=level.puzzles.puzzles[obj.puzzle_id]
+                active=obj.id in puzzle.current_sequence or puzzle.solved
+                age=self.feedback_fx.age('correct',object_id=obj.id)
+                lift=round(2*math.sin(min(1,(age or 0)/.5)*math.pi)) if age is not None and age<.5 else 0
+                y-=lift
+                accent=THEMES[self.atmosphere.active(level)][2]
+                pygame.draw.ellipse(screen,(14,19,26),(x-9,y+4,18,6))
+                pygame.draw.rect(screen,(65,73,85),(x-7,y+1,14,5))
+                pygame.draw.line(screen,accent if active else (135,139,148),(x-6,y+1),(x+6,y+1))
+                pygame.draw.polygon(screen,(133,141,150),[(x-5,y+1),(x-4,y-9),(x,y-12),(x+4,y-9),(x+5,y+1)])
+                pygame.draw.line(screen,(77,87,102),(x,y-7),(x+2,y+1),2)
+                pygame.draw.circle(screen,(171,178,183),(x,y-12),4)
+                pygame.draw.rect(screen,(42,48,60),(x-3,y-13,6,2))
+                pygame.draw.line(screen,accent if active else (101,110,122),(x-2,y-12),(x+2,y-12))
+                # Engraved physical damage differs per guardian, never by rank.
+                pygame.draw.lines(screen,(69,78,90),False,[(x+2,y-10),(x,y-6),(x+2,y-4)],1)
+                if active:
+                    glint=round(130+80*math.sin(self.elapsed*3)**2)
+                    pygame.draw.line(screen,(glint,glint,180),(x-4,y+4),(x+4,y+4))
                 if level.ghost and level.center(obj.cell).distance_to(level.position)<=40:
                     color=(147,242,239)
                     radius=9+round(2*math.sin(self.elapsed*4))
@@ -211,13 +243,27 @@ class PuzzleGame(SimpleMapGame):
                     rank=level.puzzles.puzzles[obj.puzzle_id].solution.index(obj.id)+1
                     self.label(screen,str(rank),(x,y-24),color,self.small,align="center")
             elif obj.type=='plateau':
-                # Dalle brune du plateau : couleur nettement distincte du sol
-                # du sanctuaire, visible vivant comme fantome (le plateau est
-                # toujours la, seul le bon chemin dessus reste un secret).
-                pygame.draw.rect(screen,(58,38,24),(x-8,y-6,16,13))
-                pygame.draw.rect(screen,(101,72,44),(x-7,y-6,14,11))
-                pygame.draw.line(screen,(133,98,60),(x-7,y-6),(x+7,y-6))
-                pygame.draw.rect(screen,(84,58,36),(x-7,y-6,14,11),1)
+                path=level.path_cells[obj.puzzle_id]
+                progress=level.path_progress.get(obj.puzzle_id,0)
+                passed=obj.cell in path[:progress]
+                underfoot=level.cell==obj.cell and not level.ghost
+                # Only already traversed tiles light up; the future route stays hidden.
+                accent=THEMES[self.atmosphere.active(level)][2]
+                sink=1 if underfoot else 0
+                y+=sink
+                pygame.draw.rect(screen,(13,23,29),(x-8,y-7,16,15))
+                pygame.draw.rect(screen,(72,86,92),(x-7,y-7,14,11))
+                pygame.draw.line(screen,(138,152,151),(x-7,y-7),(x+6,y-7))
+                pygame.draw.line(screen,(36,49,57),(x-7,y+5),(x+6,y+5),2)
+                for dx in (-5,5):
+                    pygame.draw.circle(screen,(153,154,136),(x+dx,y-5),1)
+                pygame.draw.lines(screen,(45,61,67),False,[(x-2,y-3),(x+1,y),(x-1,y+3)],1)
+                if passed:
+                    pygame.draw.rect(screen,accent,(x-6,y-6,12,10),1)
+                    pygame.draw.line(screen,(169,216,209),(x-3,y+1),(x-1,y+3))
+                    pygame.draw.line(screen,(169,216,209),(x-1,y+3),(x+3,y-2))
+                if underfoot:
+                    pygame.draw.line(screen,(198,215,210),(x-5,y+6),(x+5,y+6))
             elif obj.type=='footprint':
                 color=(66,140,224)
                 pulse=(math.sin(self.elapsed*3+obj.cell[0]*1.3+obj.cell[1]*1.7)+1)/2
@@ -252,7 +298,8 @@ class PuzzleGame(SimpleMapGame):
     def draw_top_bar(self,screen):
         pygame.draw.rect(screen,INK,(0,0,VIEW.w,VIEW.y))
         pygame.draw.line(screen,DIVIDER,(0,VIEW.y-1),(VIEW.w,VIEW.y-1))
-        self.label(screen,'LE SANCTUAIRE - TROIS ENIGMES',(8,3),GOLD,self.font)
+        theme = THEMES.get(self.atmosphere.active(self.level))
+        self.label(screen,theme[0] if theme else 'LE SANCTUAIRE - TROIS ENIGMES',(8,3),theme[2] if theme else GOLD,self.font)
         self.label(screen,'Observer en fantome, agir en vivant',(8,19),(139,156,163),self.small)
 
     def _puzzle_sidebar_layout(self):
@@ -477,9 +524,8 @@ class PuzzleGame(SimpleMapGame):
         self.label(screen,'Jaune ? : epreuve | Points colores : portes',(box.x+10,box.bottom-13),GOLD,self.small)
 
     def draw_win(self,screen):
-        # Plus de clear() ici : comme sur l'ecran de mort, le HUD reste visible
-        # mais passe au second plan sous le voile pose par present().
-        super().draw_win(screen)
+        self.victory_scene.draw(screen,self)
+
 
 
 def run(window):
@@ -511,6 +557,7 @@ def run(window):
             if '--smoke-test' in sys.argv:
                 return 'menu'
     finally:
+        game.audio.stop()
         if pygame.mixer.get_init(): pygame.mixer.music.unpause()
         # Ne pas laisser la reverberation de la partie jouer sur le menu.
         for sound in game.feedback_fx.sounds.values():

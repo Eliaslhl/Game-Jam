@@ -25,13 +25,13 @@ class Pulse:
 class SanctuaryFeedback:
     _sound_cache = {}
 
-    def __init__(self):
+    def __init__(self, sound_enabled=True):
         self.pulses=[]
         self.freeze_remaining=0.0
         self.slow_remaining=0.0
         self.last_sounds={}
         self.clock=0.0
-        self.sounds=self.make_sounds()
+        self.sounds=self.make_sounds() if sound_enabled else {}
 
     @classmethod
     def make_sounds(cls):
@@ -109,7 +109,7 @@ class SanctuaryFeedback:
             color=COLORS.get(pulse.kind,(192,204,213))
             x,y=game.point(pulse.position)
             if pulse.kind=='solved':
-                self.draw_ritual(layer,game,pulse,color)
+                self.draw_revelation(layer,game,pulse,color)
                 room=ROOM_RECTS.get(room_at(*pulse.position))
                 if room:
                     left,top=game.point(room.topleft)
@@ -159,20 +159,12 @@ class SanctuaryFeedback:
                     pos=previous.lerp(end,travel)
                     pygame.draw.circle(layer,(*color,230),(round(pos.x),round(pos.y)),2)
 
-    def draw_ritual(self,layer,game,pulse,color):
+    def draw_revelation(self,layer,game,pulse,color):
         chest=next((o for o in game.level.objects if o.type=='chest' and o.puzzle_id==pulse.puzzle_id),None)
         anchor=game.level.center(chest.cell) if chest else pulse.position
         x,y=game.point(anchor)
         age=pulse.age
         envelope=min(1,age/.22)*max(0,1-age/2.4)
-        # Deux anneaux contrarotatifs, graves de petits sigils geometriques.
-        for ring,base in enumerate((23,37)):
-            radius=base*min(1,.25+age*2)
-            pygame.draw.ellipse(layer,(*color,round(150*envelope)),(round(x-radius),round(y-radius*.48),round(radius*2),round(radius*.96)),1)
-            for i in range(10):
-                angle=i*math.tau/10+age*(.6 if ring==0 else -.4)
-                px=x+math.cos(angle)*radius;py=y+math.sin(angle)*radius*.48
-                pygame.draw.lines(layer,(*color,round(230*envelope)),False,[(round(px-2),round(py+2)),(round(px),round(py-3)),(round(px+2),round(py+2))],1)
         # Colonne de lumiere en expansion puis dissolution.
         height=round(105*min(1,age*2.8))
         for width,alpha in ((24,16),(12,26),(4,72)):
