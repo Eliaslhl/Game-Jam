@@ -55,7 +55,11 @@ def generate_path(rng, rect, anchor, length=8, attempts=25):
 class PuzzleLevel(TrainingLevel):
     def __init__(self, path=MAP_PATH, seed=None):
         super().__init__(path, hole_count=0)
-        self.mode.auto_return_on_timeout = True
+        # Rester fantome jusqu'au bout du temps TUE : c'est la seule facon de
+        # perdre ici, puisqu'il n'y a plus de pieges. A True, le fantome etait
+        # simplement ramene a son corps et la partie devenait impossible a
+        # perdre (voir GhostModeController.update()).
+        self.mode.auto_return_on_timeout = False
         rng = random.Random(seed)
         self.rooms = {'tomb': pygame.Rect(10,34,6,6),
                       'statue': pygame.Rect(35,34,5,5),
