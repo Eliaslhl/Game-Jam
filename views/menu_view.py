@@ -195,12 +195,16 @@ def run(screen: pygame.Surface) -> None:
             if action == "play":
                 if puzzle_view.run(screen) == 'quit':
                     return
+                if pygame.mixer.get_init():
+                    pygame.mixer.music.unpause()
                 # La partie a pu changer de resolution (F11) : on reprend la
                 # fenetre courante et on recalcule la mise en page dessus.
                 screen = _fullscreen_window()
                 scene = MenuScene(screen)
             elif action == "tutorial":
                 training_map_view.run(screen)
+                if pygame.mixer.get_init():
+                    pygame.mixer.music.unpause()
                 screen = _fullscreen_window()
                 scene = MenuScene(screen)
             elif action == "quit":

@@ -193,6 +193,8 @@ class SimpleMapGame:
         if state == self.end_sound_state:
             return
         if state in self.end_sounds:
+            if pygame.mixer.get_init():
+                pygame.mixer.music.pause()
             self.end_sounds[state].play()
         self.end_sound_state = state
 
@@ -261,6 +263,8 @@ class SimpleMapGame:
         if key == pygame.K_m:
             self.map_open = not self.map_open
         elif key == pygame.K_n and (self.level.won or self.level.lost):
+            if pygame.mixer.get_init():
+                pygame.mixer.music.unpause()
             self.__init__()
         elif not self.map_open:
             self.level.action(key)

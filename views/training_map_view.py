@@ -151,6 +151,8 @@ class TrainingGame:
 
     def event(self, key):
         if key == pygame.K_n and (self.level.won or self.level.lost):
+            if pygame.mixer.get_init():
+                pygame.mixer.music.unpause()
             self.__init__(scale=self.scale, offset=self.offset)
         else:
             self.level.action(key)
