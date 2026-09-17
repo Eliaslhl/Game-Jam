@@ -167,4 +167,6 @@ class TrainingLevel:
             self.won = True
             self.say("Sortie atteinte : le couloir est valide.")
         elif self.ghost and self.tile(*self.cell) == "E":
-            self.say("Une ame ne peut pas franchir le seuil : redevenez humain (P).")
+            # Meme vocabulaire que la partie ("fantome", "vivant") et memes
+            # touches de retour, pour ne rien enseigner qui change ensuite.
+            self.say("Un fantome ne peut pas franchir le seuil : redevenez vivant (P ou Entree).")

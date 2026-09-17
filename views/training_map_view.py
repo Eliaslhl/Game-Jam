@@ -279,7 +279,9 @@ class TrainingGame:
         if level.dead or level.lost:
             status, status_color = "MORT", DEAD_STATUS
         elif level.ghost:
-            status, status_color = "AME ERRANTE", GHOST_STATUS
+            # "FANTOME" comme en partie (PuzzleGame.draw_sidebar) : le tutoriel
+            # sert a apprendre le jeu, pas un autre vocabulaire.
+            status, status_color = "FANTOME", GHOST_STATUS
         else:
             status, status_color = "VIVANT", WHITE
         self.label(screen, status, (8, 79), status_color, self.small)
