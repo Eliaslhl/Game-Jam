@@ -107,9 +107,33 @@ class PuzzleLevel(TrainingLevel):
         # celles encore fermees ; une epreuve reussie rend une clef argentee
         # pour retenter sa chance sur une autre salle.
         self.special_rooms = {'NW': pygame.Rect(10,10,6,6), 'NE': pygame.Rect(34,10,6,6), 'W': pygame.Rect(5,22,7,6)}
-        special_entry = {'NW': (13,16), 'NE': (37,16), 'W': (11,25)}
         self.special_order = rng.sample(list(self.special_rooms), 3)
-        gold_room = rng.choice(self.special_order)
+        self.special_rng = rng
+        self.first_special_room = None
+        self._prepare_special_rooms(rng, definitions)
+        self.puzzles = PuzzleManager(definitions, seed=seed)
+        self.puzzles.puzzles['tomb'].solution = ['tomb_'+str(self.targets['tomb'])]
+        self.puzzles.puzzles['statue'].solution = ['moving_statue']
+        self.puzzles.puzzles['wall'].solution = ['wall_'+str(self.targets['wall'])]
+        # Conserver la desactivation des trous introduite sur main.
+        self.time = 0.0
+        self.key_ready_at = {}
+        self.keys = set()
+        self.silver_keys = 0
+        self.keys_total = 3
+        self.cooldown = 0.0
+        self.events = []
+        self.feedback = ''
+        self.feedback_time = 0.0
+        self.mode.poison_potions.count = 3
+        self.mode.resurrection_potions.count = 3
+        self.say('Zones jaunes sur la carte (M). P : fantome. E : fouiller, pousser ou frapper.')
+
+    def _prepare_special_rooms(self, rng, definitions, first_room=None):
+        """Rebuild unopened rooms before the very first silver door opens."""
+        special_entry = {'NW': (13,16), 'NE': (37,16), 'W': (11,25)}
+        gold_room = rng.choice([r for r in self.special_order if r != first_room])
+        self.gold_room = gold_room
         trial_rooms = [r for r in self.special_order if r != gold_room]
         trial_kinds = rng.sample(['statues', 'path'], 2)
         self.special_content = {gold_room: 'gold', **dict(zip(trial_rooms, trial_kinds))}
@@ -135,7 +159,8 @@ class PuzzleLevel(TrainingLevel):
                     decoy_cell = PATH_LAYOUT[room]['decoy']
                 else:
                     decoy_cell = center
-                self.objects.append(PuzzleObject(room+'_decoy', 'chest', decoy_cell, state='closed', text=room))
+                self.objects.append(PuzzleObject(room+'_decoy', 'chest', decoy_cell, state='closed', text=room,
+                    loot={'poison': 1, 'resurrection': 1}))
                 if kind == 'statues':
                     members = [pid+'_'+str(i) for i in range(4)]
                     definitions.append(dict(id=pid, type='sequence', members=members,
@@ -145,23 +170,20 @@ class PuzzleLevel(TrainingLevel):
                     self.path_plateau[pid] = plateau
                     self.path_cells[pid] = generate_path(rng, plateau, decoy_cell)
                     definitions.append(dict(id=pid, type='physical', solution=[], reward={'type': 'key', 'id': 'silver'}))
-        self.puzzles = PuzzleManager(definitions, seed=seed)
-        self.puzzles.puzzles['tomb'].solution = ['tomb_'+str(self.targets['tomb'])]
-        self.puzzles.puzzles['statue'].solution = ['moving_statue']
-        self.puzzles.puzzles['wall'].solution = ['wall_'+str(self.targets['wall'])]
-        # Conserver la desactivation des trous introduite sur main.
-        self.time = 0.0
-        self.key_ready_at = {}
-        self.keys = set()
-        self.silver_keys = 0
-        self.keys_total = 3
-        self.cooldown = 0.0
-        self.events = []
-        self.feedback = ''
-        self.feedback_time = 0.0
-        self.mode.poison_potions.count = 3
-        self.mode.resurrection_potions.count = 3
-        self.say('Zones jaunes sur la carte (M). P : fantome. E : fouiller, pousser ou frapper.')
+
+    def _choose_gold_after_first_door(self, room):
+        if self.first_special_room is not None:
+            return
+        self.first_special_room = room
+        # Initial layout is only a hidden placeholder; no special room can
+        # have been entered yet. Select uniformly among the two other doors.
+        doors = {o.id:o for o in self.objects if o.id.startswith('special_entry_')}
+        prefixes = ('special_entry_', 'NW_', 'NE_', 'W_')
+        self.objects = [o for o in self.objects if not o.id.startswith(prefixes)]
+        definitions = []
+        self._prepare_special_rooms(self.special_rng, definitions, first_room=room)
+        self.objects = [doors.get(o.id,o) for o in self.objects]
+        self.puzzles.puzzles.update(PuzzleManager(definitions, seed=self.special_rng.randrange(2**32)).puzzles)
 
     @property
     def trial_room(self):
@@ -220,17 +242,19 @@ class PuzzleLevel(TrainingLevel):
 
     def _interact_special_chest(self, obj):
         if obj.state != 'closed': return 'locked'
+        # Tous les coffres speciaux ravitaillent, une seule fois, meme ceux
+        # dont l'ouverture declenche l'epreuve et referme la porte.
+        self.mode.poison_potions.count += obj.loot.get('poison',0)
+        self.mode.resurrection_potions.count += obj.loot.get('resurrection',0)
         if obj.text == 'gold':
             obj.state = 'open'
-            self.mode.poison_potions.count += obj.loot.get('poison',0)
-            self.mode.resurrection_potions.count += obj.loot.get('resurrection',0)
             key = next(o for o in self.objects if o.type == 'key' and o.cell == obj.cell)
             self.key_ready_at[key.id] = self.time + .65
-            self.notify('chest','Un eclat dore : la clef doree est a vous !',obj)
+            self.notify('chest','+1 poison, +1 resurrection. Une clef doree emerge du coffre !',obj)
             return 'opened'
         obj.state = 'hidden'
-        self.notify('chest','Le coffre etait un leurre et disparait. La salle se referme derriere vous.',obj)
         self._spawn_special_trial(obj.text)
+        self.notify('chest','+1 poison, +1 resurrection. Le coffre disparait : la salle se referme !',obj)
         return 'empty'
 
     def _reveal_reward(self, pid, obj):
@@ -339,6 +363,9 @@ class PuzzleLevel(TrainingLevel):
                 if self.silver_keys <= 0:
                     self.notify('wrong','La porte est verrouillee. Il faut une clef argentee.')
                     return 'locked'
+                room = obj.id.removeprefix('special_entry_')
+                self._choose_gold_after_first_door(room)
+                obj = next(o for o in self.objects if o.id == 'special_entry_'+room)
                 self.silver_keys -= 1
                 obj.state = 'open'
                 self.notify('door','La porte est ouverte. La clef argentee est depensee.',obj)
