@@ -123,11 +123,18 @@ class PuzzleGame(SimpleMapGame):
         super().draw_special_tiles(screen,level)
         for obj in sorted(level.objects,key=lambda o: -1 if o.type=='plateau' else (0 if o.type=='chest' else (2 if o.type=='key' else 1))):
             if not obj.visible_to(level): continue
+            # Hors de la salle speciale ou l'on se trouve, seule la porte (sa
+            # couleur) se voit : le contenu (coffre, epreuve, cle) et sa
+            # solution restent caches, meme en fantome juste a cote - sinon la
+            # surprise est grillee avant meme d'entrer.
+            if obj.type != 'door' and level.special_room_hidden(obj.cell): continue
             if obj.type in ('clue','footprint') and level.center(obj.cell).distance_to(level.position)>90: continue
             x,y=self.point(level.center(obj.cell))
             if obj.type in ('tomb','statue','wall','socket'):
                 target=level.targets.get(obj.puzzle_id)
-                spectral = level.ghost and (
+                # La solution (aura spectrale) ne doit se voir que depuis
+                # l'interieur de sa propre salle classique, jamais de loin.
+                spectral = level.ghost and level.trial_room==obj.puzzle_id and (
                     (obj.type=='tomb' and obj.id==obj.puzzle_id+'_'+str(target)) or
                     (obj.type=='wall' and obj.id==obj.puzzle_id+'_'+str(target)) or
                     (obj.type=='socket' and obj.cell==target))

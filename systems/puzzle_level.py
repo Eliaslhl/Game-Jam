@@ -171,6 +171,18 @@ class PuzzleLevel(TrainingLevel):
     def special_room(self):
         return next((name for name,rect in self.special_rooms.items() if rect.collidepoint(self.cell)), None)
 
+    def special_room_hidden(self, cell):
+        """Vrai si `cell` appartient a une salle speciale dans laquelle le
+        joueur ne se trouve pas physiquement en ce moment : le contenu
+        (coffre, epreuve, cle) et sa solution restent invisibles depuis
+        l'exterieur - meme en fantome, meme juste a cote - tant qu'on n'est
+        pas entre dans cette salle precise. Seule la porte (sa couleur)
+        echappe a cette regle, donc le rendu doit excepter les objets de type
+        'door'. Des qu'on ressort, le contenu redevient invisible : rien n'est
+        memorise d'une visite a l'autre."""
+        room = next((r for r,rect in self.special_rooms.items() if rect.collidepoint(cell)), None)
+        return room is not None and room != self.special_room
+
     def _spawn_special_trial(self, room):
         if room in self.special_spawned: return
         self.special_spawned.add(room)
@@ -452,7 +464,8 @@ class PuzzleLevel(TrainingLevel):
         self.show_trial_hint(zone)
         if self.ghost:
             for obj in self.objects:
-                if obj.type == 'order_statue' and self.center(obj.cell).distance_to(self.position) <= 40:
+                if (obj.type == 'order_statue' and not self.special_room_hidden(obj.cell)
+                        and self.center(obj.cell).distance_to(self.position) <= 40):
                     if self.puzzles.observe(obj.puzzle_id, obj.id, ghost=True):
                         rank = self.puzzles.puzzles[obj.puzzle_id].solution.index(obj.id)+1
                         self.notify('clue', f'Inscription spectrale : rang {rank}.', obj)
